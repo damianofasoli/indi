@@ -85,28 +85,25 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
             }
             else if (!connected && isConnected)
             {
-                // DAM Do not disconnect Indi connection
-                sendResponseValue(res,false);
-
-                // // Disconnect the device
-                // auto connectSw = m_Device.getSwitch("CONNECTION");
-                // if (connectSw)
-                // {
-                //     INDI::PropertySwitch switchProperty(connectSw);
-                //     switchProperty.reset();
-                //     switchProperty[1].setState(ISS_ON);
-                //     // Request to send the switch to the device
-                //     requestNewSwitch(switchProperty);
-                //     sendResponseValue(res, false);
-                // }
-                // else
-                // {
-                //     sendResponseValue(res, true, "Failed to disconnect device");
-                // }
+                // Disconnect the device
+                auto connectSw = m_Device.getSwitch("CONNECTION");
+                if (connectSw)
+                {
+                    INDI::PropertySwitch switchProperty(connectSw);
+                    switchProperty.reset();
+                    switchProperty[1].setState(ISS_ON);
+                    // Request to send the switch to the device
+                    requestNewSwitch(switchProperty);
+                    sendResponseValue(res, false);
+                }
+                else
+                {
+                    sendResponseValue(res, true, "Failed to disconnect device");
+                }
             }
             else
             {
-                // No change needed//
+                // No change needed
                 sendResponseValue(res, isConnected);
             }
         }

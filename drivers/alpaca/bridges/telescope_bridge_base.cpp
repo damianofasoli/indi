@@ -65,7 +65,7 @@ std::string TelescopeBridge::getUniqueID() const
 
 void TelescopeBridge::handleRequest(const std::string &method, const httplib::Request &req, httplib::Response &res)
 {
-    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_SESSION, "Handling telescope request: %s", method.c_str());
+    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Handling telescope request: %s", method.c_str());
 
     // Common methods
     if (method == "connected")
