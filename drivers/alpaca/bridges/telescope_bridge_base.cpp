@@ -65,7 +65,7 @@ std::string TelescopeBridge::getUniqueID() const
 
 void TelescopeBridge::handleRequest(const std::string &method, const httplib::Request &req, httplib::Response &res)
 {
-    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Handling telescope request: %s", method.c_str());
+    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_SESSION, "Handling telescope request: %s", method.c_str());
 
     // Common methods
     if (method == "connected")
@@ -109,18 +109,38 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleCanSync(req, res);
     else if (method == "declination")
         handleDeclination(req, res);
-    else if (method == "declinationrate")
-        handleDeclinationRate(req, res);
+    else if (method == "declinationrate") {
+        if (req.method=="PUT") 
+            handleSetDeclinationRate(req, res);
+        else
+            handleDeclinationRate(req, res);
+    }        
+    else if (method == "setdeclinationrate")
+        handleSetDeclinationRate(req, res);
     else if (method == "rightascension")
         handleRightAscension(req, res);
-    else if (method == "rightascensionrate")
-        handleRightAscensionRate(req, res);
+    else if (method == "rightascensionrate") {
+        if (req.method=="PUT") 
+            handleSetRightAscensionRate(req, res);
+        else    
+            handleRightAscensionRate(req, res);
+    }        
+    else if (method == "setrightascensionrate")
+        handleSetRightAscensionRate(req, res);
     else if (method == "sideofpier")
         handleSideOfPier(req, res);
     else if (method == "slewing")
         handleSlewing(req, res);
-    else if (method == "tracking")
-        handleTracking(req, res);
+    else if (method == "tracking") {
+        if (req.method=="PUT") 
+            handleSetTracking(req, res);       
+        else
+            handleTracking(req, res);
+    }        
+    else if (method == "settracking")
+        handleSetTracking(req, res);
+    else if (method == "trackingrates") 
+        handleTrackingRates(req, res);    
     else if (method == "atpark")
         handleAtPark(req, res);
     // Telescope-specific actions
@@ -142,12 +162,6 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleMoveAxis(req, res);
     else if (method == "axisrates")
         handleAxisRates(req, res);
-    else if (method == "settracking")
-        handleSetTracking(req, res);
-    else if (method == "setrightascensionrate")
-        handleSetRightAscensionRate(req, res);
-    else if (method == "setdeclinationrate")
-        handleSetDeclinationRate(req, res);
     else if (method == "equatorialsystem")
         handleEquatorialSystem(req, res);
     else if (method == "sitelatitude")
