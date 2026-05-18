@@ -242,6 +242,12 @@ void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Respon
     sendResponseValue(res, m_Device.getProperty("EQUATORIAL_EOD_COORD").isValid());
 }
 
+void TelescopeBridge::handleCanFindHome(const httplib::Request &req, httplib::Response &res)
+{
+    INDI_UNUSED(req);
+    sendResponseValue(res, m_Device.getProperty("TELESCOPE_HOME").isValid());
+}
+
 void TelescopeBridge::handleCanMoveAxis(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
