@@ -245,7 +245,17 @@ void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Respon
 void TelescopeBridge::handleCanFindHome(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res, m_Device.getProperty("TELESCOPE_HOME").isValid());
+    bool canFindHome=false;
+    INDI::Property property = m_Device.getProperty("TELESCOPE_HOME"); 
+    if (property.isValid()) {
+        INDI::PropertySwitch switchProperty(property);
+        for (auto &num : switchProperty)
+        {
+            if (num.isNameMatch("FIND"))
+                canFindHome = true;
+        }
+    }
+    sendResponseValue(res, canFindHome);
 }
 
 void TelescopeBridge::handleCanMoveAxis(const httplib::Request &req, httplib::Response &res)
