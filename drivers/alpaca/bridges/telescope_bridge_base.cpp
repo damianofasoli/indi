@@ -170,6 +170,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleSiteLongitude(req, res);
     else if (method == "siteelevation")
         handleSiteElevation(req, res);
+    else if (method == "canfindhome")
+        handleCanFindHome(req, res);
     else
     {
         // Unknown method
