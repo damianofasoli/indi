@@ -143,7 +143,7 @@ void TelescopeBridge::handleDriverInfo(const httplib::Request &req, httplib::Res
 void TelescopeBridge::handleDriverVersion(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    std::string version = "1.0";
+    std::string version = "2.0";
     sendResponseValue(res, version);
 }
 
@@ -234,6 +234,11 @@ void TelescopeBridge::handleCanSetDeclinationRate(const httplib::Request &req, h
 {
     INDI_UNUSED(req);
     sendResponseValue(res, m_Device.getProperty("TELESCOPE_TRACK_RATE").isValid());
+}
+
+void TelescopeBridge::handleCanSetGuideRates(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseValue(res, m_Device.getProperty("GUIDE_RATE").isValid()); 
 }
 
 void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Response &res)
