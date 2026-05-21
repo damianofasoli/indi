@@ -241,6 +241,11 @@ void TelescopeBridge::handleCanSetGuideRates(const httplib::Request &req, httpli
     sendResponseValue(res, m_Device.getProperty("GUIDE_RATE").isValid()); 
 }
 
+void TelescopeBridge::handleCanSetPark(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseValue(res, m_Device.getProperty("TELESCOPE_PARK_OPTION").isValid()); 
+}
+
 void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
@@ -448,6 +453,35 @@ void TelescopeBridge::handleUnpark(const httplib::Request &req, httplib::Respons
     }
 
     sendResponseStatus(res, success, success ? "" : "Failed to unpark telescope");
+}
+
+void TelescopeBridge::handleSetPark(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    bool success = false;
+    auto parkOptionSw = m_Device.getSwitch("TELESCOPE_PARK_OPTION");
+    if (parkOptionSw)
+    {
+        INDI::PropertySwitch switchProperty(parkOptionSw);
+        // Search for PARK_CURRENT WidgetViewSwitch
+        int i=-1;
+        int j=-1;
+        for(auto wvs: parkOptionSw) {
+            j++;
+            if (wvs.isNameMatch("PARK_CURRENT")) {
+                i=j;
+                break;
+            }
+        }
+        // Apply PARK_CURRENT action
+        if (i>=0) {
+            switchProperty.reset();
+            switchProperty[i].setState(ISS_ON);
+            requestNewSwitch(switchProperty);
+            success = true;
+        }
+    }
+
+    sendResponseStatus(res, success, success ? "" : "Failed to set park position for telescope");      
 }
 
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res)
