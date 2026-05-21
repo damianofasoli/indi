@@ -90,6 +90,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleAzimuth(req, res);
     else if (method == "canpark")
         handleCanPark(req, res);
+    else if (method == "cansetpark") 
+        handleCanSetPark(req,res);
     else if (method == "canpulseguide")
         handleCanPulseGuide(req, res);
     else if (method == "cansettracking")
@@ -132,6 +134,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
     }        
     else if (method == "setrightascensionrate")
         handleSetRightAscensionRate(req, res);
+    else if (method == "setpark")
+        handleSetPark(req, res);
     else if (method == "sideofpier")
         handleSideOfPier(req, res);
     else if (method == "slewing")
