@@ -42,6 +42,7 @@ using json = nlohmann::json;
 TelescopeBridge::TelescopeBridge(INDI::BaseDevice device, int deviceNumber)
     : m_Device(device), m_DeviceNumber(deviceNumber)
 {
+    m_HomeDEC = std::nan("");
     DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_SESSION, "Created telescope bridge for device %s with number %d",
                  device.getDeviceName(), deviceNumber);
 }
@@ -147,6 +148,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleTrackingRates(req, res);    
     else if (method == "atpark")
         handleAtPark(req, res);
+    else if (method == "athome")
+        handleAtHome(req, res);
     // Telescope-specific actions
     else if (method == "abortslew")
         handleAbortSlew(req, res);
@@ -154,6 +157,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handlePark(req, res);
     else if (method == "unpark")
         handleUnpark(req, res);
+    else if (method == "findhome")
+        handleFindHome(req, res);
     else if (method == "slewtocoordinates")
         handleSlewToCoordinates(req, res);
     else if (method == "slewtocoordinatesasync")
@@ -201,12 +206,16 @@ void TelescopeBridge::updateProperty(INDI::Property property)
         INDI::PropertyNumber numberProperty(property);
         for (auto &num : numberProperty)
         {
-            if (num.isNameMatch("RA"))
+            if (num.isNameMatch("RA")) {
                 m_CurrentRA = num.getValue();
-            else if (num.isNameMatch("DEC"))
+            }
+            else if (num.isNameMatch("DEC")) {
                 m_CurrentDEC = num.getValue();
+                if (std::isnan(m_HomeDEC)) m_HomeDEC=m_CurrentDEC;                
+            }
         }
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC);
+        m_IsAtHome = (m_CurrentDEC==m_HomeDEC);
+        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC); 
     }
     else if (property.isNameMatch("HORIZONTAL_COORD"))
     {
