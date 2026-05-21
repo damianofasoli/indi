@@ -90,6 +90,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleAzimuth(req, res);
     else if (method == "canpark")
         handleCanPark(req, res);
+    else if (method == "canunpark")
+        handleCanUnpark(req, res);
     else if (method == "cansetpark") 
         handleCanSetPark(req,res);
     else if (method == "canpulseguide")
