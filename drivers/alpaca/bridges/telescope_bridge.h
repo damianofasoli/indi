@@ -171,8 +171,10 @@ class TelescopeBridge : public IDeviceBridge
         double m_RightAscensionRate {0}, m_DeclinationRate {0};
         bool m_IsTracking {false};
         bool m_IsParked {false};
-        bool m_IsSlewing {false};
+        bool m_IsSlewing {false};        
         int m_PierSide {0};
+        bool m_IsAtHome {true};
+        double m_HomeDEC; // see constructor
 
         // Thread safety
         std::mutex m_Mutex;

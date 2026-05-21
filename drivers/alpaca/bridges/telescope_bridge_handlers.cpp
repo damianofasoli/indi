@@ -252,14 +252,18 @@ void TelescopeBridge::handleCanFindHome(const httplib::Request &req, httplib::Re
     INDI_UNUSED(req);
     bool canFindHome=false;
     INDI::Property property = m_Device.getProperty("TELESCOPE_HOME"); 
-    if (property.isValid()) {
-        INDI::PropertySwitch switchProperty(property);
-        for (auto &num : switchProperty)
-        {
-            if (num.isNameMatch("FIND"))
-                canFindHome = true;
-        }
-    }
+    // For Alpaca findhome is just as INDI GO HOME and
+    // because INDI SET HOME (user defined one) is not defined, neither INDI FIND HOME (mount defined one) 
+    // So we don't check FIND switch property
+    // if (property.isValid()) {
+    //     INDI::PropertySwitch switchProperty(property);
+    //     for (auto &num : switchProperty)
+    //     {
+    //         if (num.isNameMatch("FIND"))
+    //             canFindHome = true;
+    //     }
+    // }
+    canFindHome=property.isValid();
     sendResponseValue(res, canFindHome);
 }
 
@@ -355,6 +359,12 @@ void TelescopeBridge::handleAtPark(const httplib::Request &req, httplib::Respons
     sendResponseValue(res, m_IsParked);
 }
 
+void TelescopeBridge::handleAtHome(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    sendResponseValue(res, m_IsAtHome);    
+}
+
 // Telescope-specific actions
 void TelescopeBridge::handleAbortSlew(const httplib::Request &req, httplib::Response &res)
 {
@@ -390,6 +400,36 @@ void TelescopeBridge::handlePark(const httplib::Request &req, httplib::Response 
     }
 
     sendResponseStatus(res, success, success ? "" : "Failed to park telescope");
+}
+
+void TelescopeBridge::handleFindHome(const httplib::Request &req, httplib::Response &res) 
+{
+    INDI_UNUSED(req);
+    bool success = false;
+    auto homeSw = m_Device.getSwitch("TELESCOPE_HOME");
+    if (homeSw)
+    {
+        INDI::PropertySwitch switchProperty(homeSw);
+        // Search for GO WidgetViewSwitch (some drives lack FIND, but have GO)
+        int i=-1;
+        int j=-1;
+        for(auto wvs: homeSw) {
+            j++;
+            if (wvs.isNameMatch("GO")) {
+                i=j;
+                break;
+            }
+        }
+        // Apply GO HOME action
+        if (i>=0) {
+            switchProperty.reset();
+            switchProperty[i].setState(ISS_ON);
+            requestNewSwitch(switchProperty);
+            success = true;
+        }
+    }
+
+    sendResponseStatus(res, success, success ? "" : "Failed to send to home telescope");    
 }
 
 void TelescopeBridge::handleUnpark(const httplib::Request &req, httplib::Response &res)
