@@ -272,6 +272,11 @@ void TelescopeBridge::handleCanFindHome(const httplib::Request &req, httplib::Re
     sendResponseValue(res, canFindHome);
 }
 
+void TelescopeBridge::handleCanUnpark(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseValue(res, m_Device.getProperty("TELESCOPE_PARK").isValid());        
+}
+
 void TelescopeBridge::handleCanMoveAxis(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
