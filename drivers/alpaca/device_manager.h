@@ -80,6 +80,8 @@ class DeviceManager
         // Send commands to INDI server
         void sendNewNumber(const INDI::PropertyNumber &numberProperty);
         void sendNewSwitch(const INDI::PropertySwitch &switchProperty);
+        void sendNewText(const INDI::PropertyText &textProperty);
+
 
     public:
         // Helper method to extract transaction IDs from request

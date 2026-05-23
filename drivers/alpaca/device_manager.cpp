@@ -89,6 +89,20 @@ void DeviceManager::sendNewSwitch(const INDI::PropertySwitch &switchProperty)
     }
 }
 
+void DeviceManager::sendNewText(const INDI::PropertyText &textProperty)
+{
+    if (m_Client)
+    {
+        DEBUGFDEVICE("INDI Alpaca Server", INDI::Logger::DBG_DEBUG, "Sending new text property: %s", textProperty.getName());
+        m_Client->sendNewText(textProperty);
+    }
+    else
+    {
+        DEBUGDEVICE("INDI Alpaca Server", INDI::Logger::DBG_ERROR, "Cannot send new text property: AlpacaClient not set");
+    }
+}
+
+
 void DeviceManager::addDevice(INDI::BaseDevice device)
 {
     std::lock_guard<std::mutex> lock(m_Mutex);
