@@ -354,6 +354,7 @@ void TelescopeBridge::handleTrackingRates(const httplib::Request &req, httplib::
 {
     INDI_UNUSED(req);
     // TODO: Tracking rates from INDI Switches    
+    // TODO: Get and Put Request for TrackingRate
     json trRatesArray = json::array();
     trRatesArray.push_back(0);
     trRatesArray.push_back(1);
