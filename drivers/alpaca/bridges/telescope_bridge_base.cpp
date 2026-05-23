@@ -136,6 +136,12 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
     }        
     else if (method == "setrightascensionrate")
         handleSetRightAscensionRate(req, res);
+    else if (method == "utcdate") {
+        if (req.method=="PUT")
+          handleSetUTCDate(req, res);
+        else
+          handleUTCDate(req, res);
+    }    
     else if (method == "setpark")
         handleSetPark(req, res);
     else if (method == "sideofpier")
@@ -334,6 +340,14 @@ void TelescopeBridge::requestNewSwitch(const INDI::PropertySwitch &switchPropert
     DeviceManager::getInstance()->sendNewSwitch(switchProperty);
 }
 
+void TelescopeBridge::requestNewText(const INDI::PropertyText &textProperty)
+{
+    // Forward the request to the DeviceManager
+    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Request to send new text property: %s",
+                 textProperty.getName());
+
+    DeviceManager::getInstance()->sendNewText(textProperty);
+}
 
 // Helper methods for sending standard JSON responses
 void TelescopeBridge::sendResponse(httplib::Response &res, bool success, const std::string &errorMessage)

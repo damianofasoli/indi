@@ -125,6 +125,7 @@ class TelescopeBridge : public IDeviceBridge
         void handleSetPark(const httplib::Request &req, httplib::Response &res);
         void handleSetRightAscensionRate(const httplib::Request &req, httplib::Response &res);
         void handleSetTracking(const httplib::Request &req, httplib::Response &res);
+        void handleSetUTCDate(const httplib::Request &req, httplib::Response &res);
         void handleSlewToAltAz(const httplib::Request &req, httplib::Response &res);
         void handleSlewToAltAzAsync(const httplib::Request &req, httplib::Response &res);
         void handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res);
@@ -140,6 +141,7 @@ class TelescopeBridge : public IDeviceBridge
         // These methods should be implemented by the AlpacaClient
         void requestNewNumber(const INDI::PropertyNumber &numberProperty);
         void requestNewSwitch(const INDI::PropertySwitch &switchProperty);
+        void requestNewText(const INDI::PropertyText &textProperty);
 
         // Helper methods for sending standard JSON responses
         void sendResponse(httplib::Response &res, bool success, const std::string &errorMessage);

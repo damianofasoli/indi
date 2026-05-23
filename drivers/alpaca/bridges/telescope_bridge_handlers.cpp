@@ -489,6 +489,26 @@ void TelescopeBridge::handleSetPark(const httplib::Request &req, httplib::Respon
     sendResponseStatus(res, success, success ? "" : "Failed to set park position for telescope");      
 }
 
+void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::string utc_alpaca="1970-01-01T00:00:00Z"; //fallback
+    auto utcTxt = m_Device.getText("TIME_UTC");
+    if (utcTxt) {
+        for(auto wvt: utcTxt) {
+            if (wvt.isNameMatch("UTC")) {
+                std::string utc_indi = wvt.getText(); // like 2026-05-22T22:09:28+00:00
+                size_t pos = utc_indi.rfind("+00:00"); // Find the offset at the end   
+                if (pos != std::string::npos) {
+                    // Replace 6 characters starting at 'pos' with "Z"
+                    utc_alpaca=utc_indi.replace(pos, 6, "Z");
+                }               
+                break;
+            }
+        }
+    }
+    sendResponseValue(res,utc_alpaca);
+}
+
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res)
 {
     bool success = false;
@@ -919,6 +939,49 @@ void TelescopeBridge::handleSetTracking(const httplib::Request &req, httplib::Re
     catch (const std::exception &e)
     {
         DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SetTracking request: %s", e.what());
+    }
+
+    sendResponseStatus(res, success, success ? "" : "Failed to set tracking state");
+}
+
+void TelescopeBridge::handleSetUTCDate(const httplib::Request &req, httplib::Response &res) {
+    bool success = false;
+    try
+    {
+        // Parse form-urlencoded data from request body
+        std::map<std::string, std::string> formData;
+        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+        // Check if required parameters exist
+        if (formData.find("UTCDate") == formData.end())
+        {
+            sendResponseStatus(res, false, "Missing UTCDate parameter");
+            return;
+        }
+
+        std::string utc_alpaca = formData["UTCDate"];
+
+        auto utcTxt = m_Device.getText("TIME_UTC");
+        if (utcTxt)
+        {
+            std::string utc_indi="";
+            if (!utc_alpaca.empty() && utc_alpaca.back() == 'Z') {
+                // Replace the last 1 character with "+00:00"
+                utc_indi = utc_alpaca.replace(utc_alpaca.length() - 1, 1, "+00:00");
+            }            
+            if (!utc_indi.empty()) {
+
+                INDI::PropertyText textProperty(utcTxt);
+                textProperty[0].setText(utc_indi);
+                // Request to send the text to the device
+                requestNewText(textProperty);
+                success = true;
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse UTCDate request: %s", e.what());
     }
 
     sendResponseStatus(res, success, success ? "" : "Failed to set tracking state");
