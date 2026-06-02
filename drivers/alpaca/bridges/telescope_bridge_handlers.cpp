@@ -80,26 +80,32 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                 }
                 else
                 {
-                    sendResponseValue(res, false, "Failed to connect device");
+                    sendResponseValue(res, false, false, "Failed to connect device");
                 }
             }
             else if (!connected && isConnected)
             {
-                // Disconnect the device
-                auto connectSw = m_Device.getSwitch("CONNECTION");
-                if (connectSw)
-                {
-                    INDI::PropertySwitch switchProperty(connectSw);
-                    switchProperty.reset();
-                    switchProperty[1].setState(ISS_ON);
-                    // Request to send the switch to the device
-                    requestNewSwitch(switchProperty);
-                    sendResponseValue(res, false);
-                }
-                else
-                {
-                    sendResponseValue(res, true, "Failed to disconnect device");
-                }
+                // DO NOT DISCONNECT DEVICE FROM INDI
+                // JUST CONSIDER THAT THIS IS THE BEHAVIOUR
+                // WITH TWO DISTINCT INDI CLIENTS, FOR EXAMPLE TWO CCDCIEL INSTANCES
+                // SO LET'S BEHAVE ALPACA DISCONNECT IN A SIMILAR WAY TO NOT BREAK OTHER ALPACA OR INDI CLIENTS  
+                sendResponseValue(res,  true);
+
+                // // Disconnect the device
+                // auto connectSw = m_Device.getSwitch("CONNECTION");
+                // if (connectSw)
+                // {
+                //     INDI::PropertySwitch switchProperty(connectSw);
+                //     switchProperty.reset();
+                //     switchProperty[1].setState(ISS_ON);
+                //     // Request to send the switch to the device
+                //     requestNewSwitch(switchProperty);
+                //     sendResponseValue(res, false);
+                // }
+                // else
+                // {
+                //     sendResponseValue(res, true, false, "Failed to disconnect device");
+                // }
             }
             else
             {
