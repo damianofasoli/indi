@@ -144,8 +144,10 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                 // DO NOT DISCONNECT DEVICE FROM INDI
                 // JUST CONSIDER THAT THIS IS THE BEHAVIOUR
                 // WITH TWO DISTINCT INDI CLIENTS, FOR EXAMPLE TWO CCDCIEL INSTANCES
-                // SO LET'S BEHAVE ALPACA DISCONNECT IN A SIMILAR WAY TO NOT BREAK OTHER ALPACA OR INDI CLIENTS  
-                sendResponseValue(res,  true);
+                // SO LET'S BEHAVE ALPACA DISCONNECT IN A SIMILAR WAY TO NOT BREAK OTHER ALPACA OR INDI CLIENTS
+                //  
+                // Return value is false, because Alpaca requires it after Alpaca disconnection
+                sendResponseValue(res,  false);
 
                 // // Disconnect the device
                 // auto connectSw = m_Device.getSwitch("CONNECTION");
