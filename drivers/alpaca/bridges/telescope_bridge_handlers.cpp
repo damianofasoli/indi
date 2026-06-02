@@ -31,8 +31,7 @@
 #include <cstring>
 #include <sstream>
 #include <chrono>
-#include <iomanip>
-#include <numbers>  // C++20 for std::numbers::pi
+
 
 #ifdef _USE_SYSTEM_JSONLIB
 #include <nlohmann/json.hpp>
@@ -42,57 +41,50 @@
 
 using json = nlohmann::json;
 
-// Clock helper methods
-std::chrono::system_clock::time_point TelescopeBridge::parseIndiUtc(const std::string &indiTime)
-{
-    // e.g. "2026-05-22T22:09:28+00:00"
-    std::tm tm = {};
-    std::istringstream ss(indiTime);
-    ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
 
-    // timegm treats the tm as UTC (portable: use _mkgmtime on Windows)
-    std::time_t t = timegm(&tm);
-    return std::chrono::system_clock::from_time_t(t);
-}
-
-// Returns LST in hours [0, 24)
-double TelescopeBridge::localSiderealTime(
-    std::chrono::system_clock::time_point utc,
-    double longitudeDeg)   // east positive
+/**
+ * Compute Local Sidereal Time (LST) in hours [0, 24)
+ *
+ * @param longitude_deg  Observer's longitude in degrees (East positive, West negative)
+ * @param tp             UTC time point (defaults to now)
+ * @return               LST in decimal hours [0, 24)
+ */
+double TelescopeBridge::computeLST(double longitude_deg,
+                                   std::chrono::system_clock::time_point tp = std::chrono::system_clock::now() )
 {
-    // Seconds since Unix epoch (1970-01-01 00:00:00 UTC)
+    // Convert time_point to Julian Date
+    // Unix epoch (1970-01-01 00:00:00 UTC) = JD 2440587.5
     using namespace std::chrono;
-    double unixSec = duration<double>(utc.time_since_epoch()).count();
-
-    // Julian Date: Unix epoch = JD 2440587.5
-    double jd = unixSec / 86400.0 + 2440587.5;
+    double unix_seconds = duration<double>(tp.time_since_epoch()).count();
+    double JD = 2440587.5 + unix_seconds / 86400.0;
 
     // Julian centuries from J2000.0 (JD 2451545.0)
-    double T = (jd - 2451545.0) / 36525.0;
+    double T = (JD - 2451545.0) / 36525.0;
 
-    // GMST in seconds at 0h UT (IAU formula)
-    double gmst_sec = 24110.54841
-                    + 8640184.812866 * T
-                    + 0.093104 * T * T
-                    - 6.2e-6  * T * T * T;
+    // Greenwich Mean Sidereal Time (GMST) in seconds at 0h UT
+    // IAU formula (Astronomical Almanac)
+    double GMST_seconds = 24110.54841
+                        + 8640184.812866 * T
+                        + 0.093104      * T * T
+                        - 6.2e-6        * T * T * T;
 
-    // Add UT contribution (Earth rotation since midnight)
-    // Seconds since previous midnight UTC
-    double ut1_sec = std::fmod(unixSec, 86400.0);
-    if (ut1_sec < 0) ut1_sec += 86400.0;
+    // Add UT contribution: Earth rotates 360° in one sidereal day
+    // 1 solar day = 1.00273790935 sidereal days
+    double UT_seconds = std::fmod(unix_seconds, 86400.0);
+    GMST_seconds += UT_seconds * 1.00273790935;
 
-    // Sidereal rate ≈ 1.00273790935 solar days per sidereal day
-    gmst_sec += ut1_sec * 1.00273790935;
+    // Convert to hours and normalize to [0, 24)
+    double GMST_hours = std::fmod(GMST_seconds / 3600.0, 24.0);
+    if (GMST_hours < 0.0) GMST_hours += 24.0;
 
-    // Convert to hours, normalise to [0, 24)
-    double gmst_h = std::fmod(gmst_sec / 3600.0, 24.0);
-    if (gmst_h < 0) gmst_h += 24.0;
+    // Apply longitude offset (15°/hour)
+    double LST = GMST_hours + longitude_deg / 15.0;
 
-    // LST = GMST + longitude converted to hours (15°/h)
-    double lst = std::fmod(gmst_h + longitudeDeg / 15.0, 24.0);
-    if (lst < 0) lst += 24.0;
+    // Normalize to [0, 24)
+    LST = std::fmod(LST, 24.0);
+    if (LST < 0.0) LST += 24.0;
 
-    return lst;   // hours
+    return LST;
 }
 
 // Common Alpaca API methods
@@ -561,10 +553,7 @@ void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Respon
     if (utcTxt) {
         for(auto &wvt: utcTxt) {
             if (wvt.isNameMatch("UTC")) {
-                std::string utc_indi = wvt.getText(); // like 2026-05-22T22:09:28+00:00
-                // sync the clock for siderealtime, when it is computed
-                std::chrono::system_clock::time_point tp = parseIndiUtc(utc_indi);
-                clock.sync(tp);                
+                std::string utc_indi = wvt.getText(); // like 2026-05-22T22:09:28+00:00             
                 size_t pos = utc_indi.rfind("+00:00"); // Find the offset at the end   
                 if (pos != std::string::npos) {
                     // Replace 6 characters starting at 'pos' with "Z"
@@ -610,7 +599,7 @@ void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::R
                 break;
             }
         }     
-        lst_alpaca = localSiderealTime(clock.now(), longitudeDeg);        
+        lst_alpaca = computeLST(longitudeDeg);        
     }
     sendResponseValue(res,lst_alpaca); 
 }
@@ -1080,7 +1069,7 @@ void TelescopeBridge::handleSetUTCDate(const httplib::Request &req, httplib::Res
                 INDI::PropertyText textProperty(utcTxt);
                 textProperty[0].setText(utc_indi);
                 // Request to send the text to the device
-                requestNewText(textProperty);
+                requestNewText(textProperty);                  
                 success = true;
             }
         }
