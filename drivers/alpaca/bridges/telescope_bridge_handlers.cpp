@@ -30,6 +30,9 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
+#include <chrono>
+#include <iomanip>
+#include <numbers>  // C++20 for std::numbers::pi
 
 #ifdef _USE_SYSTEM_JSONLIB
 #include <nlohmann/json.hpp>
@@ -38,6 +41,59 @@
 #endif
 
 using json = nlohmann::json;
+
+// Clock helper methods
+std::chrono::system_clock::time_point TelescopeBridge::parseIndiUtc(const std::string &indiTime)
+{
+    // e.g. "2026-05-22T22:09:28+00:00"
+    std::tm tm = {};
+    std::istringstream ss(indiTime);
+    ss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+
+    // timegm treats the tm as UTC (portable: use _mkgmtime on Windows)
+    std::time_t t = timegm(&tm);
+    return std::chrono::system_clock::from_time_t(t);
+}
+
+// Returns LST in hours [0, 24)
+double TelescopeBridge::localSiderealTime(
+    std::chrono::system_clock::time_point utc,
+    double longitudeDeg)   // east positive
+{
+    // Seconds since Unix epoch (1970-01-01 00:00:00 UTC)
+    using namespace std::chrono;
+    double unixSec = duration<double>(utc.time_since_epoch()).count();
+
+    // Julian Date: Unix epoch = JD 2440587.5
+    double jd = unixSec / 86400.0 + 2440587.5;
+
+    // Julian centuries from J2000.0 (JD 2451545.0)
+    double T = (jd - 2451545.0) / 36525.0;
+
+    // GMST in seconds at 0h UT (IAU formula)
+    double gmst_sec = 24110.54841
+                    + 8640184.812866 * T
+                    + 0.093104 * T * T
+                    - 6.2e-6  * T * T * T;
+
+    // Add UT contribution (Earth rotation since midnight)
+    // Seconds since previous midnight UTC
+    double ut1_sec = std::fmod(unixSec, 86400.0);
+    if (ut1_sec < 0) ut1_sec += 86400.0;
+
+    // Sidereal rate ≈ 1.00273790935 solar days per sidereal day
+    gmst_sec += ut1_sec * 1.00273790935;
+
+    // Convert to hours, normalise to [0, 24)
+    double gmst_h = std::fmod(gmst_sec / 3600.0, 24.0);
+    if (gmst_h < 0) gmst_h += 24.0;
+
+    // LST = GMST + longitude converted to hours (15°/h)
+    double lst = std::fmod(gmst_h + longitudeDeg / 15.0, 24.0);
+    if (lst < 0) lst += 24.0;
+
+    return lst;   // hours
+}
 
 // Common Alpaca API methods
 void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Response &res)
@@ -430,7 +486,7 @@ void TelescopeBridge::handleFindHome(const httplib::Request &req, httplib::Respo
         // Search for GO WidgetViewSwitch (some drives lack FIND, but have GO)
         int i=-1;
         int j=-1;
-        for(auto wvs: homeSw) {
+        for(auto &wvs: homeSw) {
             j++;
             if (wvs.isNameMatch("GO")) {
                 i=j;
@@ -477,7 +533,7 @@ void TelescopeBridge::handleSetPark(const httplib::Request &req, httplib::Respon
         // Search for PARK_CURRENT WidgetViewSwitch
         int i=-1;
         int j=-1;
-        for(auto wvs: parkOptionSw) {
+        for(auto &wvs: parkOptionSw) {
             j++;
             if (wvs.isNameMatch("PARK_CURRENT")) {
                 i=j;
@@ -501,9 +557,12 @@ void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Respon
     std::string utc_alpaca="1970-01-01T00:00:00Z"; //fallback
     auto utcTxt = m_Device.getText("TIME_UTC");
     if (utcTxt) {
-        for(auto wvt: utcTxt) {
+        for(auto &wvt: utcTxt) {
             if (wvt.isNameMatch("UTC")) {
                 std::string utc_indi = wvt.getText(); // like 2026-05-22T22:09:28+00:00
+                // sync the clock for siderealtime, when it is computed
+                std::chrono::system_clock::time_point tp = parseIndiUtc(utc_indi);
+                clock.sync(tp);                
                 size_t pos = utc_indi.rfind("+00:00"); // Find the offset at the end   
                 if (pos != std::string::npos) {
                     // Replace 6 characters starting at 'pos' with "Z"
@@ -513,7 +572,45 @@ void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Respon
             }
         }
     }
+    // return value
     sendResponseValue(res,utc_alpaca);
+}
+
+void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    // Sidereal time is taken from Number if available, otherwise it is computed
+    bool computeFlag = true;
+    double lst_alpaca;
+    auto lstNumber = m_Device.getNumber("TIME_LST");
+    if (lstNumber.isValid()) {
+        for(auto &wvn: lstNumber) {
+            if (wvn.isNameMatch("LST")) {
+                lst_alpaca = wvn.getValue(); 
+                computeFlag=false;
+                break;
+            }
+        }                
+    } 
+    if (computeFlag) {
+        auto geoCoord = m_Device.getNumber("GEOGRAPHIC_COORD");
+        if (!geoCoord.isValid())
+        {
+            sendResponseValue(res, 0.0, false, "GEOGRAPHIC_COORD property not found");
+            return;
+        }        
+        double longitudeDeg = 0.0;
+        INDI::PropertyNumber numberProperty(geoCoord);
+        for (auto &num : numberProperty)
+        {
+            if (num.isNameMatch("LONG"))
+            {
+                longitudeDeg = num.getValue();
+                break;
+            }
+        }     
+        lst_alpaca = localSiderealTime(clock.now(), longitudeDeg);        
+    }
+    sendResponseValue(res,lst_alpaca); 
 }
 
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res)
