@@ -52,6 +52,7 @@ using json = nlohmann::json;
 double TelescopeBridge::computeLST(double longitude_deg,
                                    std::chrono::system_clock::time_point tp = std::chrono::system_clock::now() )
 {
+
     // Convert time_point to Julian Date
     // Unix epoch (1970-01-01 00:00:00 UTC) = JD 2440587.5
     using namespace std::chrono;
@@ -59,7 +60,9 @@ double TelescopeBridge::computeLST(double longitude_deg,
     double JD = 2440587.5 + unix_seconds / 86400.0;
 
     // Julian centuries from J2000.0 (JD 2451545.0)
-    double T = (JD - 2451545.0) / 36525.0;
+    // double T = (JD - 2451545.0) / 36525.0;
+    double JD0 = std::floor(JD - 0.5) + 0.5;  // JD at previous midnight
+    double T = (JD0 - 2451545.0) / 36525.0;   // T at 0h UT
 
     // Greenwich Mean Sidereal Time (GMST) in seconds at 0h UT
     // IAU formula (Astronomical Almanac)
@@ -70,7 +73,8 @@ double TelescopeBridge::computeLST(double longitude_deg,
 
     // Add UT contribution: Earth rotates 360° in one sidereal day
     // 1 solar day = 1.00273790935 sidereal days
-    double UT_seconds = std::fmod(unix_seconds, 86400.0);
+    //double UT_seconds = std::fmod(unix_seconds, 86400.0);
+    double UT_seconds  = (JD - JD0) * 86400.0;         // seconds since midnight
     GMST_seconds += UT_seconds * 1.00273790935;
 
     // Convert to hours and normalize to [0, 24)
