@@ -11,7 +11,7 @@
       "name": "(gdb) Attach indi_alpaca_server",
       "type": "cppdbg",
       "request": "attach",
-      "program": "indi/build/indi-build/drivers/alpaca/indi_alpaca_server",
+      "program": "/home/damiano/indi/build/indi-build/drivers/alpaca/indi_alpaca_server",
       "MIMode": "gdb",
       "setupCommands": [
           {

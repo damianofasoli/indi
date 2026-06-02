@@ -142,6 +142,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         else
           handleUTCDate(req, res);
     }    
+    else if (method == "siderealtime")
+        handleSiderealTime(req, res);
     else if (method == "setpark")
         handleSetPark(req, res);
     else if (method == "sideofpier")

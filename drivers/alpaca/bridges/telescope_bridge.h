@@ -29,6 +29,32 @@
 #include "indiproperty.h"
 #include <string>
 #include <mutex>
+#include <chrono>
+
+struct UtcClock {
+
+    bool isSynced() const { return synced; }
+
+    // To be called when the UTC timestamp is read from the telescope
+    void sync(std::chrono::system_clock::time_point telescopeUtc) {
+        referenceUtc    = telescopeUtc;
+        referenceSteady = std::chrono::steady_clock::now();
+        synced          = true;
+    }
+
+    // Call anytime after sync() — returns a fresh UTC estimate
+    std::chrono::system_clock::time_point now() const {
+        if (!synced)
+            return std::chrono::system_clock::now();  // fallback        
+        auto elapsed = std::chrono::steady_clock::now() - referenceSteady;
+        return referenceUtc + std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed);
+    }
+
+private:
+    std::chrono::system_clock::time_point referenceUtc;
+    std::chrono::steady_clock::time_point referenceSteady;
+    bool synced = false;
+};
 
 class TelescopeBridge : public IDeviceBridge
 {
@@ -63,6 +89,9 @@ class TelescopeBridge : public IDeviceBridge
         void handleInterfaceVersion(const httplib::Request &req, httplib::Response &res) override;
 
     private:
+        // clock helper methods
+        std::chrono::system_clock::time_point parseIndiUtc(const std::string &indiTime);
+        double localSiderealTime(std::chrono::system_clock::time_point utc, double longitudeDeg);        
         // Telescope-specific Alpaca API methods
         void handleAlignmentMode(const httplib::Request &req, httplib::Response &res);
         void handleAltitude(const httplib::Request &req, httplib::Response &res);
@@ -177,6 +206,9 @@ class TelescopeBridge : public IDeviceBridge
         int m_PierSide {0};
         bool m_IsAtHome {true};
         double m_HomeDEC; // see constructor
+
+        // Clock for siderealtime, when it is computed
+        UtcClock clock;
 
         // Thread safety
         std::mutex m_Mutex;
