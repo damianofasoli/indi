@@ -413,15 +413,127 @@ void TelescopeBridge::handleTracking(const httplib::Request &req, httplib::Respo
 void TelescopeBridge::handleTrackingRates(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    // TODO: Tracking rates from INDI Switches    
-    // TODO: Get and Put Request for TrackingRate
+
     json trRatesArray = json::array();
-    trRatesArray.push_back(0);
-    trRatesArray.push_back(1);
-    trRatesArray.push_back(2);
-    trRatesArray.push_back(3);    
+    // fallback
+    trRatesArray.push_back(0);  // Alpaca driveSidereal
+
+    auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
+    if (trackModeSw)
+    {
+        for (auto &wvs:trackModeSw) {
+            if (wvs.isNameMatch("TRACK_SIDEREAL")) {
+                // already set
+            } 
+            else if (wvs.isNameMatch("TRACK_LUNAR")) {
+                trRatesArray.push_back(1);  // Alpaca driveLunar
+            } 
+            else if (wvs.isNameMatch("TRACK_SOLAR")) {
+                trRatesArray.push_back(2);  // Alpaca driveSolar
+            } 
+            else if (wvs.isNameMatch("TRACK_KING")) {
+                trRatesArray.push_back(3);  // Alpaca driveKing
+            } 
+            // Note that Indi TRACK_CUSTOM is handled in Alpaca 
+            // using driveSidereal rate and DeclinationRate and RightAscensionRate values
+        }
+    }           
     sendResponseValue(res, trRatesArray);    
 }
+
+void TelescopeBridge::handleTrackingRate(const httplib::Request &req, httplib::Response &res) 
+{
+    if (req.method=="PUT") {
+        std::map<std::string, std::string> formData;
+        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+        // Check if required parameters exist
+        if (formData.find("TrackingRate") == formData.end())
+        {
+            sendResponseStatus(res, false, "Missing TrackingRate parameter");
+            return;
+        }
+        else {
+            bool success = false;
+            int tracking_rate = std::stoi(formData["TrackingRate"]);
+            auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
+            if (trackModeSw)
+            {
+                int i=-1;
+                int j=-1;
+                for (auto &wvs: trackModeSw) {
+                    i++;
+                    if (tracking_rate == 0 && wvs.isNameMatch("TRACK_SIDEREAL")) {
+                        j=i; 
+                        break;
+                    }
+                    if (tracking_rate == 1 && wvs.isNameMatch("TRACK_LUNAR")) {
+                        j=i; 
+                        break;
+                    }
+                    if (tracking_rate == 2 && wvs.isNameMatch("TRACK_SOLAR")) {
+                        j=i; 
+                        break;
+                    }
+                    if (tracking_rate == 3 && wvs.isNameMatch("TRACK_KING")) {
+                        j=i; 
+                        break;
+                    }                                        
+                }
+                if (j>=0) {
+                    INDI::PropertySwitch switchProperty(trackModeSw);
+                    switchProperty.reset();
+                    switchProperty[j].setState(ISS_ON);
+                    // Request to send the switch to the device
+                    requestNewSwitch(switchProperty);
+                    success = true;
+                }
+            }            
+            sendResponseStatus(res, success, success ? "" : "Failed to set TrackingRate");
+            return;
+        }
+    }
+    else {
+        int tracking_rate = 0; // fallback, Alpaca driveSidereal
+        auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
+        if (trackModeSw) {
+            for (auto &wvs: trackModeSw) {
+                if (wvs.isNameMatch("TRACK_SIDEREAL")) {
+                    if (wvs.getState()==ISS_ON) {
+                        tracking_rate=0; // Alpaca driveSidereal
+                        break;
+                    }
+                }
+                else if (wvs.isNameMatch("TRACK_LUNAR")) {
+                    if (wvs.getState()==ISS_ON) {
+                        tracking_rate=1; // Alpaca driveLunar
+                        break;
+                    }
+                }
+                else if (wvs.isNameMatch("TRACK_SOLAR")) {
+                    if (wvs.getState()==ISS_ON) {
+                        tracking_rate=2; // Alpaca driveSolar
+                        break;
+                    }
+                }
+                else if (wvs.isNameMatch("TRACK_KING")) {
+                    if (wvs.getState()==ISS_ON) {
+                        tracking_rate=3; // Alpaca driveKing
+                        break;
+                    }
+                }
+                else if (wvs.isNameMatch("TRACK_CUSTOM")) {
+                    if (wvs.getState()==ISS_ON) {
+                        tracking_rate=0; // Alpaca driveSidereal (note that Alpaca uses DeclinationRate and RightAscensionRate)
+                        break;
+                    }
+                }
+            }
+        }
+        sendResponseValue(res, tracking_rate);
+    }
+}
+
 
 void TelescopeBridge::handleAtPark(const httplib::Request &req, httplib::Response &res)
 {
@@ -1102,25 +1214,44 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
             return;
         }
 
-        // Convert RightAscensionRate value to double
-        double raRate = std::stod(formData["RightAscensionRate"]);
+        auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
+        if (trackModeSw) {
+            int j=-1;
+            for (auto &wvs :trackModeSw) {
+                j++;
+                if (wvs.isNameMatch("TRACK_CUSTOM")) {
+                  
+                    INDI::PropertySwitch switchProperty(trackModeSw);
+                    switchProperty.reset();
+                    switchProperty[j].setState(ISS_ON);
+                    requestNewSwitch(switchProperty);
 
-        auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
-        if (trackRate)
-        {
-            INDI::PropertyNumber numberProperty(trackRate);
-            for (auto &num : numberProperty)
-            {
-                if (num.isNameMatch("TRACK_RATE_RA"))
-                    num.setValue(raRate);
+                    // Convert RightAscensionRate value to double
+                    double raRate = std::stod(formData["RightAscensionRate"]);
+
+                    auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
+                    if (trackRate)
+                    {
+                        INDI::PropertyNumber numberProperty(trackRate);
+                        for (auto &num : numberProperty)
+                        {
+                            if (num.isNameMatch("TRACK_RATE_RA"))
+                                num.setValue(raRate);
+                        }
+                        // Request to send the rate to the device
+                        requestNewNumber(numberProperty);
+
+                        // Update the member variable
+                        m_RightAscensionRate = raRate;
+                        success = true;
+                        break;
+                    }
+                  
+                }
             }
-            // Request to send the rate to the device
-            requestNewNumber(numberProperty);
-
-            // Update the member variable
-            m_RightAscensionRate = raRate;
-            success = true;
         }
+
+
     }
     catch (const std::exception &e)
     {
@@ -1147,25 +1278,43 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
             return;
         }
 
-        // Convert DeclinationRate value to double
-        double decRate = std::stod(formData["DeclinationRate"]);
+        // Set Tracking mode to CUSTOM
+        auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
+        if (trackModeSw) {
+            int j=-1;
+            for (auto &wvs :trackModeSw) {
+                j++;
+                if (wvs.isNameMatch("TRACK_CUSTOM")) {
+                  
+                    INDI::PropertySwitch switchProperty(trackModeSw);
+                    switchProperty[j].setState(ISS_ON);
+                    requestNewSwitch(switchProperty);
 
-        auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
-        if (trackRate)
-        {
-            INDI::PropertyNumber numberProperty(trackRate);
-            for (auto &num : numberProperty)
-            {
-                if (num.isNameMatch("TRACK_RATE_DE"))
-                    num.setValue(decRate);
+                    // Convert DeclinationRate value to double
+                    double decRate = std::stod(formData["DeclinationRate"]);
+
+                    auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
+                    if (trackRate)
+                    {
+                        INDI::PropertyNumber numberProperty(trackRate);
+                        for (auto &num : numberProperty)
+                        {
+                            if (num.isNameMatch("TRACK_RATE_DE"))
+                                num.setValue(decRate);
+                        }
+                        // Request to send the rate to the device
+                        requestNewNumber(numberProperty);
+
+                        // Update the member variable
+                        m_DeclinationRate = decRate;
+                        success = true;
+                        break;
+                    }
+                  
+                }
             }
-            // Request to send the rate to the device
-            requestNewNumber(numberProperty);
-
-            // Update the member variable
-            m_DeclinationRate = decRate;
-            success = true;
         }
+
     }
     catch (const std::exception &e)
     {
