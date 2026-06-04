@@ -1287,6 +1287,7 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
                 if (wvs.isNameMatch("TRACK_CUSTOM")) {
                   
                     INDI::PropertySwitch switchProperty(trackModeSw);
+                    switchProperty.reset();
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
