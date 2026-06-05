@@ -372,7 +372,7 @@ void TelescopeBridge::handleDeclinationRate(const httplib::Request &req, httplib
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_DeclinationRate);
+    sendResponseValue(res, m_DeclinationRate-0.0); // absolute values
 }
 
 void TelescopeBridge::handleRightAscension(const httplib::Request &req, httplib::Response &res)
@@ -386,7 +386,7 @@ void TelescopeBridge::handleRightAscensionRate(const httplib::Request &req, http
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_RightAscensionRate);
+    sendResponseValue(res, m_RightAscensionRate-15.041067); // absolute values
 }
 
 void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Response &res)
@@ -1213,36 +1213,24 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
             sendResponseStatus(res, false, "Missing RightAscensionRate parameter");
             return;
         }
-
-        // Disable tracking
-        auto trackState = m_Device.getSwitch("TELESCOPE_TRACK_STATE");
-        if (trackState)
-        {
-            if (trackState[0].getState()==ISS_ON) {
-                INDI::PropertySwitch switchProperty(trackState);
-                switchProperty.reset();
-                switchProperty[1].setState(ISS_ON);
-                // Request to send the switch to the device
-                requestNewSwitch(switchProperty);
-            }
-        }        
         
+        // Convert RightAscensionRate value to double
+        double raRate = std::stod(formData["RightAscensionRate"]);
 
+        // Set Tracking mode to CUSTOM   
         auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
         if (trackModeSw) {
             int j=-1;
             for (auto &wvs :trackModeSw) {
                 j++;
-                if (wvs.isNameMatch("TRACK_CUSTOM")) {
+                if ( (raRate==0.0 && wvs.isNameMatch("TRACK_SIDEREAL")) || (raRate!=0.0 && wvs.isNameMatch("TRACK_CUSTOM")) ) {
                   
                     INDI::PropertySwitch switchProperty(trackModeSw);
                     switchProperty.reset();
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
-                    // Convert RightAscensionRate value to double
-                    double raRate = std::stod(formData["RightAscensionRate"]);
-
+                    raRate = 15.041067 + raRate; // absolute values
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
@@ -1264,7 +1252,6 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
                 }
             }
         }
-
 
     }
     catch (const std::exception &e)
@@ -1292,18 +1279,8 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
             return;
         }
 
-        // Disable tracking
-        auto trackState = m_Device.getSwitch("TELESCOPE_TRACK_STATE");
-        if (trackState)
-        {
-            if (trackState[0].getState()==ISS_ON) {
-                INDI::PropertySwitch switchProperty(trackState);
-                switchProperty.reset();
-                switchProperty[1].setState(ISS_ON);
-                // Request to send the switch to the device
-                requestNewSwitch(switchProperty);
-            }
-        }        
+        // Convert DeclinationRate value to double
+        double decRate = std::stod(formData["DeclinationRate"]);
 
         // Set Tracking mode to CUSTOM
         auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
@@ -1318,9 +1295,7 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
-                    // Convert DeclinationRate value to double
-                    double decRate = std::stod(formData["DeclinationRate"]);
-
+                    decRate = 0.0 + decRate; // absolute values
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
