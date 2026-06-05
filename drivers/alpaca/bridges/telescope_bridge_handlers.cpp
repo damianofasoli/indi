@@ -1214,6 +1214,20 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
             return;
         }
 
+        // Disable tracking
+        auto trackState = m_Device.getSwitch("TELESCOPE_TRACK_STATE");
+        if (trackState)
+        {
+            if (trackState[0].getState()==ISS_ON) {
+                INDI::PropertySwitch switchProperty(trackState);
+                switchProperty.reset();
+                switchProperty[1].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+            }
+        }        
+        
+
         auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
         if (trackModeSw) {
             int j=-1;
@@ -1277,6 +1291,19 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
             sendResponseStatus(res, false, "Missing DeclinationRate parameter");
             return;
         }
+
+        // Disable tracking
+        auto trackState = m_Device.getSwitch("TELESCOPE_TRACK_STATE");
+        if (trackState)
+        {
+            if (trackState[0].getState()==ISS_ON) {
+                INDI::PropertySwitch switchProperty(trackState);
+                switchProperty.reset();
+                switchProperty[1].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+            }
+        }        
 
         // Set Tracking mode to CUSTOM
         auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
