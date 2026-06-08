@@ -220,10 +220,10 @@ void TelescopeBridge::updateProperty(INDI::Property property)
     {      
         m_IsCoordsSlewing = (property.getState() == IPS_BUSY);
         if (m_IsCoordsSlewing) {
-            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_WARNING, "Updated RA/DEC skipped, coords slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC skipped, coords slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
         }
         else if (m_IsMotionSlewing) {
-            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_WARNING, "Updated RA/DEC skipped, motion slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC skipped, motion slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
         }
         else {
             // Update RA/DEC
