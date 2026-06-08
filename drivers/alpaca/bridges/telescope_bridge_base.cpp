@@ -233,9 +233,7 @@ void TelescopeBridge::updateProperty(INDI::Property property)
                 if (num.isNameMatch("RA")) {                
                     m_CurrentRA = num.getValue();
                 }
-                else if (num.isNameMatch("DEC")) {
-    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_WARNING, 
-                    "Inner Thread - Instance Address: %p, DEC Value: %f", (void*)this, m_CurrentDEC);                
+                else if (num.isNameMatch("DEC")) {              
                     m_CurrentDEC = num.getValue();
                     if (std::isnan(m_HomeDEC)) m_HomeDEC=m_CurrentDEC;                
                 }
