@@ -217,21 +217,32 @@ void TelescopeBridge::updateProperty(INDI::Property property)
 
     // Update telescope state based on property updates
     if (property.isNameMatch("EQUATORIAL_EOD_COORD"))
-    {
-        // Update RA/DEC
-        INDI::PropertyNumber numberProperty(property);
-        for (auto &num : numberProperty)
-        {
-            if (num.isNameMatch("RA")) {
-                m_CurrentRA = num.getValue();
-            }
-            else if (num.isNameMatch("DEC")) {
-                m_CurrentDEC = num.getValue();
-                if (std::isnan(m_HomeDEC)) m_HomeDEC=m_CurrentDEC;                
-            }
+    {      
+        m_IsCoordsSlewing = (property.getState() == IPS_BUSY);
+        if (m_IsCoordsSlewing) {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_WARNING, "Updated RA/DEC skipped, coords slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
         }
-        m_IsAtHome = (m_CurrentDEC==m_HomeDEC);
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC); 
+        else if (m_IsMotionSlewing) {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_WARNING, "Updated RA/DEC skipped, motion slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
+        }
+        else {
+            // Update RA/DEC
+            INDI::PropertyNumber numberProperty(property);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("RA")) {                
+                    m_CurrentRA = num.getValue();
+                }
+                else if (num.isNameMatch("DEC")) {
+    DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_WARNING, 
+                    "Inner Thread - Instance Address: %p, DEC Value: %f", (void*)this, m_CurrentDEC);                
+                    m_CurrentDEC = num.getValue();
+                    if (std::isnan(m_HomeDEC)) m_HomeDEC=m_CurrentDEC;                
+                }
+            }
+            m_IsAtHome = (m_CurrentDEC==m_HomeDEC);
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC); 
+        }
     }
     else if (property.isNameMatch("HORIZONTAL_COORD"))
     {
@@ -267,7 +278,7 @@ void TelescopeBridge::updateProperty(INDI::Property property)
         INDI::PropertySwitch switchProperty(property);
         bool isMoving = (switchProperty[0].getState() == ISS_ON || switchProperty[1].getState() == ISS_ON);
         if (isMoving)
-            m_IsSlewing = true;
+            m_IsMotionSlewing = true;
         else
         {
             // Check if the other axis is still moving
@@ -277,10 +288,10 @@ void TelescopeBridge::updateProperty(INDI::Property property)
                 if (weSp)
                 {
                     INDI::PropertySwitch weSwitch(weSp);
-                    m_IsSlewing = (weSwitch[0].getState() == ISS_ON || weSwitch[1].getState() == ISS_ON);
+                    m_IsMotionSlewing = (weSwitch[0].getState() == ISS_ON || weSwitch[1].getState() == ISS_ON);
                 }
                 else
-                    m_IsSlewing = false;
+                    m_IsMotionSlewing = false;
             }
             else
             {
@@ -288,14 +299,17 @@ void TelescopeBridge::updateProperty(INDI::Property property)
                 if (nsSp)
                 {
                     INDI::PropertySwitch nsSwitch(nsSp);
-                    m_IsSlewing = (nsSwitch[0].getState() == ISS_ON || nsSwitch[1].getState() == ISS_ON);
+                    m_IsMotionSlewing = (nsSwitch[0].getState() == ISS_ON || nsSwitch[1].getState() == ISS_ON);
                 }
                 else
-                    m_IsSlewing = false;
+                    m_IsMotionSlewing = false;
             }
         }
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated slewing state: %s",
-                     m_IsSlewing ? "SLEWING" : "NOT SLEWING");
+        if (!m_IsMotionSlewing) {
+            m_IsMotionSlewing = (property.getState() == IPS_BUSY);
+        }
+        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated motion slewing state: %s",
+                     m_IsMotionSlewing ? "MOTION SLEWING" : "NOT MOTION SLEWING");
     }
     else if (property.isNameMatch("TELESCOPE_PIER_SIDE"))
     {

@@ -365,28 +365,28 @@ void TelescopeBridge::handleDeclination(const httplib::Request &req, httplib::Re
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_CurrentDEC);
+    sendResponseValue(res, m_CurrentDEC);    
 }
 
 void TelescopeBridge::handleDeclinationRate(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_DeclinationRate-0.0); // absolute values
+    sendResponseValue(res, m_DeclinationRate * m_DeclinationRateAlpacaSign); 
 }
 
 void TelescopeBridge::handleRightAscension(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_CurrentRA);
+    sendResponseValue(res, m_CurrentRA);       
 }
 
 void TelescopeBridge::handleRightAscensionRate(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_RightAscensionRate-15.041067); // absolute values
+    sendResponseValue(res, 15.041067 - m_RightAscensionRate); // absolute values
 }
 
 void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Response &res)
@@ -400,7 +400,7 @@ void TelescopeBridge::handleSlewing(const httplib::Request &req, httplib::Respon
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_IsSlewing);
+    sendResponseValue(res, m_IsMotionSlewing || m_IsCoordsSlewing);
 }
 
 void TelescopeBridge::handleTracking(const httplib::Request &req, httplib::Response &res)
@@ -1230,7 +1230,7 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
-                    raRate = 15.041067 + raRate; // absolute values
+                    raRate = 15.041067 - raRate; // absolute values and sign change
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
@@ -1295,7 +1295,20 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
-                    decRate = 0.0 + decRate; // absolute values
+                    // detect PIER side and also change sign when PIER side is WEST
+                    double sign=1.0; 
+                    auto pierSideSw = m_Device.getSwitch("TELESCOPE_PIER_SIDE");
+                    if (pierSideSw) {
+                        for (auto wvsp:pierSideSw) {
+                            if (wvsp.isNameMatch("PIER_WEST"))
+                                if (wvsp.getState()==ISS_ON) {
+                                    sign=-1.0;
+                                    break;
+                                }
+                        }
+                    }                    
+
+                    double decRate1 = sign * (decRate - 0.0) ; // rate for Indi
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
@@ -1303,13 +1316,14 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
                         for (auto &num : numberProperty)
                         {
                             if (num.isNameMatch("TRACK_RATE_DE"))
-                                num.setValue(decRate);
+                                num.setValue(decRate1);
                         }
                         // Request to send the rate to the device
                         requestNewNumber(numberProperty);
 
-                        // Update the member variable
-                        m_DeclinationRate = decRate;
+                        // Update the member variable (keep Indi value here)
+                        m_DeclinationRate = decRate1;
+                        m_DeclinationRateAlpacaSign = sign;
                         success = true;
                         break;
                     }

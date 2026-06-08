@@ -149,7 +149,7 @@ class TelescopeBridge : public IDeviceBridge
         void sendResponse(httplib::Response &res, bool success, const std::string &errorMessage);
 
         // Generic method for sending a response with a value of any type
-        template <typename T>
+         template <typename T>
         void sendResponse(httplib::Response &res, const T &value, bool success = true,
                           const std::string &errorMessage = "", int clientID = 0, int serverID = 0);
 
@@ -173,9 +173,11 @@ class TelescopeBridge : public IDeviceBridge
         double m_CurrentAZ {0}, m_CurrentALT {0};
         double m_TargetRA {0}, m_TargetDEC {0};
         double m_RightAscensionRate {0}, m_DeclinationRate {0};
+        double m_DeclinationRateAlpacaSign {1.0};
         bool m_IsTracking {false};
         bool m_IsParked {false};
-        bool m_IsSlewing {false};        
+        bool m_IsCoordsSlewing {false};
+        bool m_IsMotionSlewing {false};        
         int m_PierSide {0};
         bool m_IsAtHome {true};
         double m_HomeDEC; // see constructor
