@@ -173,7 +173,7 @@ class TelescopeBridge : public IDeviceBridge
         double m_CurrentAZ {0}, m_CurrentALT {0};
         double m_TargetRA {0}, m_TargetDEC {0};
         double m_RightAscensionRate {0}, m_DeclinationRate {0};
-        double m_DeclinationRateAlpacaSign {1.0};
+        double m_RightAscensionRateAlpaca {0.0}, m_DeclinationRateAlpaca {0.0};
         bool m_IsTracking {false};
         bool m_IsParked {false};
         bool m_IsCoordsSlewing {false};
