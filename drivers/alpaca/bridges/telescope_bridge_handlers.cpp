@@ -372,7 +372,7 @@ void TelescopeBridge::handleDeclinationRate(const httplib::Request &req, httplib
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_DeclinationRate * m_DeclinationRateAlpacaSign); 
+    sendResponseValue(res, m_DeclinationRateAlpaca); 
 }
 
 void TelescopeBridge::handleRightAscension(const httplib::Request &req, httplib::Response &res)
@@ -386,7 +386,7 @@ void TelescopeBridge::handleRightAscensionRate(const httplib::Request &req, http
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, 15.041067 - m_RightAscensionRate); // absolute values
+    sendResponseValue(res, m_RightAscensionRateAlpaca); 
 }
 
 void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Response &res)
@@ -1230,7 +1230,7 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
-                    raRate = 15.041067 - raRate; // absolute values and sign change
+                    double raRate1 = 15.041067 * (1.0 - raRate); 
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
@@ -1238,13 +1238,14 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
                         for (auto &num : numberProperty)
                         {
                             if (num.isNameMatch("TRACK_RATE_RA"))
-                                num.setValue(raRate);
+                                num.setValue(raRate1);
                         }
                         // Request to send the rate to the device
                         requestNewNumber(numberProperty);
 
                         // Update the member variable
-                        m_RightAscensionRate = raRate;
+                        m_RightAscensionRate = raRate1;
+                        m_RightAscensionRateAlpaca = raRate;
                         success = true;
                         break;
                     }
@@ -1308,7 +1309,7 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
                         }
                     }                    
 
-                    double decRate1 = sign * (decRate - 0.0) ; // rate for Indi
+                    double decRate1 = sign * decRate * 1.0027379  ; // rate for Indi, 1 solar second is 1.0027379 sidereal seconds
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
@@ -1323,7 +1324,7 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
 
                         // Update the member variable (keep Indi value here)
                         m_DeclinationRate = decRate1;
-                        m_DeclinationRateAlpacaSign = sign;
+                        m_DeclinationRateAlpaca = decRate;
                         success = true;
                         break;
                     }
