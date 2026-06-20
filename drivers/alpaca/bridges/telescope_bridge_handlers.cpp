@@ -1224,13 +1224,28 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
             for (auto &wvs :trackModeSw) {
                 j++;
                 if ( (raRate==0.0 && wvs.isNameMatch("TRACK_SIDEREAL")) || (raRate!=0.0 && wvs.isNameMatch("TRACK_CUSTOM")) ) {
-                  
+        
+                    // disable tracking, if active
+                    bool trackingWasActive = false;            
+                    auto trackState = m_Device.getSwitch("TELESCOPE_TRACK_STATE");
+                    if (trackState)
+                    {
+                        if (trackState[0].getState()==ISS_ON) trackingWasActive=true;
+                        if (trackingWasActive) {
+                            INDI::PropertySwitch switchProperty(trackState);
+                            switchProperty.reset();
+                            switchProperty[1].setState(ISS_ON);
+                            // Request to send the switch to the device
+                            requestNewSwitch (switchProperty);
+                        }
+                    }
+
                     INDI::PropertySwitch switchProperty(trackModeSw);
                     switchProperty.reset();
                     switchProperty[j].setState(ISS_ON);
                     requestNewSwitch(switchProperty);
 
-                    double raRate1 = 15.041067 * (1.0 - raRate); 
+                    double raRate1 = 15.041067 - 15 * raRate; 
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
                     if (trackRate)
                     {
@@ -1242,10 +1257,19 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
                         }
                         // Request to send the rate to the device
                         requestNewNumber(numberProperty);
-
+                        
                         // Update the member variable
                         m_RightAscensionRate = raRate1;
                         m_RightAscensionRateAlpaca = raRate;
+
+                        // enable tracking, if it was disabled before
+                        if (trackState && trackingWasActive) {
+                            INDI::PropertySwitch switchProperty(trackState);
+                            switchProperty.reset();
+                            switchProperty[0].setState(ISS_ON);
+                            // Request to send the switch to the device
+                            requestNewSwitch(switchProperty);
+                        }                        
                         success = true;
                         break;
                     }
