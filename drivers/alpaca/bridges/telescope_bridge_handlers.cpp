@@ -570,18 +570,20 @@ void TelescopeBridge::handleAbortSlew(const httplib::Request &req, httplib::Resp
 void TelescopeBridge::handlePark(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    bool success = false;
-    auto parkSw = m_Device.getSwitch("TELESCOPE_PARK");
-    if (parkSw)
-    {
-        INDI::PropertySwitch switchProperty(parkSw);
-        switchProperty.reset();
-        switchProperty[0].setState(ISS_ON);
-        // Request to send the switch to the device
-        requestNewSwitch(switchProperty);
-        success = true;
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    bool success = m_IsParked;
+    if (!success) {
+        auto parkSw = m_Device.getSwitch("TELESCOPE_PARK");
+        if (parkSw)
+        {
+            INDI::PropertySwitch switchProperty(parkSw);
+            switchProperty.reset();
+            switchProperty[0].setState(ISS_ON);
+            // Request to send the switch to the device
+            requestNewSwitch(switchProperty);
+            success = true;
+        }
     }
-
     sendResponseStatus(res, success, success ? "" : "Failed to park telescope");
 }
 
