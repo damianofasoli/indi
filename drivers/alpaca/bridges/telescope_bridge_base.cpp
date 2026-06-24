@@ -203,7 +203,7 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
             {"ErrorNumber", 1024},
             {"ErrorMessage", "Method not implemented: " + method}
         };
-        res.status = 400;
+        res.status = 200;
         res.set_content(response.dump(), "application/json");
     }
 }
