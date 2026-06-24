@@ -210,7 +210,7 @@ void TelescopeBridge::handleDriverVersion(const httplib::Request &req, httplib::
 void TelescopeBridge::handleInterfaceVersion(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res, 2);
+    sendResponseValue(res, 3);
 }
 
 // Telescope-specific properties

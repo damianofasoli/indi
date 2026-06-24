@@ -200,7 +200,7 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         // Unknown method
         json response =
         {
-            {"ErrorNumber", 1025},
+            {"ErrorNumber", 1024},
             {"ErrorMessage", "Method not implemented: " + method}
         };
         res.status = 400;
