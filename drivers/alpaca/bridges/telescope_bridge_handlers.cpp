@@ -109,7 +109,7 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
             // Check if Connected parameter exists
             if (formData.find("Connected") == formData.end())
             {
-                sendResponseValue(res, isConnected, false, "Missing Connected parameter");
+                sendResponseValue(res, false, false, "Missing Connected parameter");
                 return;
             }
 
@@ -128,6 +128,7 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                     switchProperty[0].setState(ISS_ON);
                     // Request to send the switch to the device
                     requestNewSwitch(switchProperty);
+                    isConnectedAlpaca=true;
                     sendResponseValue(res, true);
                 }
                 else
@@ -143,6 +144,7 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                 // SO LET'S BEHAVE ALPACA DISCONNECT IN A SIMILAR WAY TO NOT BREAK OTHER ALPACA OR INDI CLIENTS
                 //  
                 // Return value is false, because Alpaca requires it after Alpaca disconnection
+                isConnectedAlpaca=false;
                 sendResponseValue(res,  false);
 
                 // // Disconnect the device
@@ -163,19 +165,20 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
             }
             else
             {
-                // No change needed
-                sendResponseValue(res, isConnected);
+                // No change needed, return Alpaca connected value as in request
+                isConnectedAlpaca=connected;
+                sendResponseValue(res, connected);
             }
         }
         catch (const std::exception &e)
         {
-            sendResponseValue(res, isConnected, false, std::string("Invalid request: ") + e.what());
+            sendResponseValue(res, false, false, std::string("Invalid request: ") + e.what());
         }
     }
     else
     {
         // GET request
-        sendResponseValue(res, isConnected);
+        sendResponseValue(res, isConnectedAlpaca);
     }
 }
 

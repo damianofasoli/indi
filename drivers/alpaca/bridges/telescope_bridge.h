@@ -181,6 +181,7 @@ class TelescopeBridge : public IDeviceBridge
         int m_PierSide {0};
         bool m_IsAtHome {true};
         double m_HomeDEC; // see constructor
+        bool isConnectedAlpaca {false};
 
         // Thread safety
         std::mutex m_Mutex;
