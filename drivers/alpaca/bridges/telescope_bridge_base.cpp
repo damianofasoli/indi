@@ -376,7 +376,7 @@ void TelescopeBridge::sendResponse(httplib::Response &res, bool success, const s
     {
         {"ClientTransactionID", clientID},
         {"ServerTransactionID", serverID},
-        {"ErrorNumber", success ? 0 : 1},
+        {"ErrorNumber", success ? 0 : 1280}, // Generic DriverException uses values 0x500-0xFFF
         {"ErrorMessage", success ? "" : errorMessage}
     };
     res.set_content(response.dump(), "application/json");
@@ -392,7 +392,7 @@ void TelescopeBridge::sendResponse(httplib::Response &res, const T &value, bool 
         {"Value", value},
         {"ClientTransactionID", clientID},
         {"ServerTransactionID", serverID},
-        {"ErrorNumber", success ? 0 : 1},
+        {"ErrorNumber", success ? 0 : 1280}, // Generic DriverException uses values 0x500-0xFFF
         {"ErrorMessage", success ? "" : errorMessage}
     };
     res.set_content(response.dump(), "application/json");
@@ -407,11 +407,11 @@ void TelescopeBridge::sendResponseValue(httplib::Response &res, const T &value,
 
 // Implementation of sendResponseStatus
 void TelescopeBridge::sendResponseStatus(httplib::Response &res, bool success,
-        const std::string &errorMessage)
+        const std::string &errorMessage, int errorNumber)
 {
     json response =
     {
-        {"ErrorNumber", success ? 0 : 1},
+        {"ErrorNumber", success ? 0 : errorNumber == 0 ? 1280 : errorNumber}, // Generic DriverException uses values 0x500-0xFFF
         {"ErrorMessage", success ? "" : errorMessage}
     };
     res.set_content(response.dump(), "application/json");
