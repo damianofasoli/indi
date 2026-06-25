@@ -1415,17 +1415,22 @@ void TelescopeBridge::handleSiteLatitude(const httplib::Request &req, httplib::R
             // Convert SiteLatitude value to double
             double latitude = std::stod(formData["SiteLatitude"]);
 
-            // Update the GEOGRAPHIC_COORD property
-            INDI::PropertyNumber numberProperty(geoCoord);
-            for (auto &num : numberProperty)
-            {
-                if (num.isNameMatch("LAT"))
-                    num.setValue(latitude);
+            if (latitude < -90.0 || latitude > 90.0) {
+                sendResponseStatus(res,false,"Latitude not valid: "+std::to_string(latitude),1025);
             }
+            else {
+                // Update the GEOGRAPHIC_COORD property
+                INDI::PropertyNumber numberProperty(geoCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("LAT"))
+                        num.setValue(latitude);
+                }
 
-            // Request to send the updated property to the device
-            requestNewNumber(numberProperty);
-            sendResponseValue(res, latitude);
+                // Request to send the updated property to the device
+                requestNewNumber(numberProperty);
+                sendResponseValue(res, latitude);
+            }
         }
         catch (const std::exception &e)
         {
@@ -1477,17 +1482,22 @@ void TelescopeBridge::handleSiteLongitude(const httplib::Request &req, httplib::
             // Convert SiteLongitude value to double
             double longitude = std::stod(formData["SiteLongitude"]);
 
-            // Update the GEOGRAPHIC_COORD property
-            INDI::PropertyNumber numberProperty(geoCoord);
-            for (auto &num : numberProperty)
-            {
-                if (num.isNameMatch("LONG"))
-                    num.setValue(longitude);
+            if (longitude < -180.0 || longitude > 180.0) {
+                sendResponseStatus(res,false,"Longitude not valid: "+std::to_string(longitude),1025);
             }
+            else {
+                // Update the GEOGRAPHIC_COORD property
+                INDI::PropertyNumber numberProperty(geoCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("LONG"))
+                        num.setValue(longitude);
+                }
 
-            // Request to send the updated property to the device
-            requestNewNumber(numberProperty);
-            sendResponseValue(res, longitude);
+                // Request to send the updated property to the device
+                requestNewNumber(numberProperty);
+                sendResponseValue(res, longitude);
+            }
         }
         catch (const std::exception &e)
         {
@@ -1539,17 +1549,22 @@ void TelescopeBridge::handleSiteElevation(const httplib::Request &req, httplib::
             // Convert SiteElevation value to double
             double elevation = std::stod(formData["SiteElevation"]);
 
-            // Update the GEOGRAPHIC_COORD property
-            INDI::PropertyNumber numberProperty(geoCoord);
-            for (auto &num : numberProperty)
-            {
-                if (num.isNameMatch("ELEV"))
-                    num.setValue(elevation);
+            if (elevation < -300.0 || elevation > 10000.0) {
+                sendResponseStatus(res,false,"Elevation not valid: "+std::to_string(elevation),1025);
             }
+            else {
+                // Update the GEOGRAPHIC_COORD property
+                INDI::PropertyNumber numberProperty(geoCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("ELEV"))
+                        num.setValue(elevation);
+                }
 
-            // Request to send the updated property to the device
-            requestNewNumber(numberProperty);
-            sendResponseValue(res, elevation);
+                // Request to send the updated property to the device
+                requestNewNumber(numberProperty);
+                sendResponseValue(res, elevation);
+            }
         }
         catch (const std::exception &e)
         {
