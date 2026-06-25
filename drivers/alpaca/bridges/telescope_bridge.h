@@ -159,7 +159,7 @@ class TelescopeBridge : public IDeviceBridge
                                bool success = true, const std::string &errorMessage = "");
 
         void sendResponseStatus(httplib::Response &res, bool success,
-                                const std::string &errorMessage = "");
+                                const std::string &errorMessage = "", int errorNumber=0);
 
 
         // Note: Implementation is split between telescope_bridge_base.cpp and telescope_bridge_handlers.cpp

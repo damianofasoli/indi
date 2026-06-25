@@ -455,6 +455,7 @@ void TelescopeBridge::handleTrackingRate(const httplib::Request &req, httplib::R
         }
         else {
             bool success = false;
+            bool rate_supported=false;
             int tracking_rate = std::stoi(formData["TrackingRate"]);
             auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
             if (trackModeSw)
@@ -465,18 +466,22 @@ void TelescopeBridge::handleTrackingRate(const httplib::Request &req, httplib::R
                     i++;
                     if (tracking_rate == 0 && wvs.isNameMatch("TRACK_SIDEREAL")) {
                         j=i; 
+                        rate_supported=true;
                         break;
                     }
                     if (tracking_rate == 1 && wvs.isNameMatch("TRACK_LUNAR")) {
                         j=i; 
+                        rate_supported=true;
                         break;
                     }
                     if (tracking_rate == 2 && wvs.isNameMatch("TRACK_SOLAR")) {
                         j=i; 
+                        rate_supported=true;
                         break;
                     }
                     if (tracking_rate == 3 && wvs.isNameMatch("TRACK_KING")) {
                         j=i; 
+                        rate_supported=true;
                         break;
                     }                                        
                 }
@@ -488,8 +493,9 @@ void TelescopeBridge::handleTrackingRate(const httplib::Request &req, httplib::R
                     requestNewSwitch(switchProperty);
                     success = true;
                 }
-            }            
-            sendResponseStatus(res, success, success ? "" : "Failed to set TrackingRate");
+            } 
+            std::string errorMessage=success ? "" : rate_supported ? "Failed to set TrackingRate" : "Tracking rate not supported: " + std::to_string(tracking_rate);
+            sendResponseStatus(res, success, errorMessage, rate_supported ? 0 : 1025); // 1025 is InvalidValueException
             return;
         }
     }
