@@ -561,19 +561,24 @@ void TelescopeBridge::handleAtHome(const httplib::Request &req, httplib::Respons
 void TelescopeBridge::handleAbortSlew(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    bool success = false;
-    auto abortSw = m_Device.getSwitch("TELESCOPE_ABORT_MOTION");
-    if (abortSw)
-    {
-        INDI::PropertySwitch switchProperty(abortSw);
-        switchProperty.reset();
-        switchProperty[0].setState(ISS_ON);
-        // Request to send the switch to the device
-        requestNewSwitch(switchProperty);
-        success = true;
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Abort slew failed because telescope is parked",1032); // ParkException
     }
+    else {
+        bool success = false;
+        auto abortSw = m_Device.getSwitch("TELESCOPE_ABORT_MOTION");
+        if (abortSw)
+        {
+            INDI::PropertySwitch switchProperty(abortSw);
+            switchProperty.reset();
+            switchProperty[0].setState(ISS_ON);
+            // Request to send the switch to the device
+            requestNewSwitch(switchProperty);
+            success = true;
+        }
 
-    sendResponseStatus(res, success, success ? "" : "Failed to abort slew");
+        sendResponseStatus(res, success, success ? "" : "Failed to abort slew");
+    }
 }
 
 void TelescopeBridge::handlePark(const httplib::Request &req, httplib::Response &res)
@@ -599,31 +604,35 @@ void TelescopeBridge::handlePark(const httplib::Request &req, httplib::Response 
 void TelescopeBridge::handleFindHome(const httplib::Request &req, httplib::Response &res) 
 {
     INDI_UNUSED(req);
-    bool success = false;
-    auto homeSw = m_Device.getSwitch("TELESCOPE_HOME");
-    if (homeSw)
-    {
-        INDI::PropertySwitch switchProperty(homeSw);
-        // Search for GO WidgetViewSwitch (some drives lack FIND, but have GO)
-        int i=-1;
-        int j=-1;
-        for(auto &wvs: homeSw) {
-            j++;
-            if (wvs.isNameMatch("GO")) {
-                i=j;
-                break;
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Find home failed because telescope is parked",1032); // ParkException
+    }
+    else {
+        bool success = false;
+        auto homeSw = m_Device.getSwitch("TELESCOPE_HOME");
+        if (homeSw)
+        {
+            INDI::PropertySwitch switchProperty(homeSw);
+            // Search for GO WidgetViewSwitch (some drives lack FIND, but have GO)
+            int i=-1;
+            int j=-1;
+            for(auto &wvs: homeSw) {
+                j++;
+                if (wvs.isNameMatch("GO")) {
+                    i=j;
+                    break;
+                }
+            }
+            // Apply GO HOME action
+            if (i>=0) {
+                switchProperty.reset();
+                switchProperty[i].setState(ISS_ON);
+                requestNewSwitch(switchProperty);
+                success = true;
             }
         }
-        // Apply GO HOME action
-        if (i>=0) {
-            switchProperty.reset();
-            switchProperty[i].setState(ISS_ON);
-            requestNewSwitch(switchProperty);
-            success = true;
-        }
+        sendResponseStatus(res, success, success ? "" : "Failed to send to home telescope");    
     }
-
-    sendResponseStatus(res, success, success ? "" : "Failed to send to home telescope");    
 }
 
 void TelescopeBridge::handleUnpark(const httplib::Request &req, httplib::Response &res)
@@ -733,172 +742,184 @@ void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::R
 
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res)
 {
-    bool success = false;
-    try
-    {
-        // Parse form-urlencoded data from request body
-        std::map<std::string, std::string> formData;
-        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
-
-        // Check if required parameters exist
-        if (formData.find("RightAscension") == formData.end() || formData.find("Declination") == formData.end())
-        {
-            sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
-            return;
-        }
-
-        // Convert values to double
-        double ra = std::stod(formData["RightAscension"]);
-        double dec = std::stod(formData["Declination"]);
-
-        auto coordSet = m_Device.getSwitch("ON_COORD_SET");
-        auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
-        if (coordSet && eqCoord)
-        {
-            // Set to TRACK mode
-            INDI::PropertySwitch switchProperty(coordSet);
-            switchProperty.reset();
-            switchProperty[0].setState(ISS_ON);
-            // Request to send the switch to the device
-            requestNewSwitch(switchProperty);
-
-            // Set coordinates
-            INDI::PropertyNumber numberProperty(eqCoord);
-            for (auto &num : numberProperty)
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Cannot slew to coordinates when telescope is parked",1032); // ParkException
+    }   
+    else {
+            bool success = false;
+            try
             {
-                if (num.isNameMatch("RA"))
-                    num.setValue(ra);
-                else if (num.isNameMatch("DEC"))
-                    num.setValue(dec);
+                // Parse form-urlencoded data from request body
+                std::map<std::string, std::string> formData;
+                DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+                // Check if required parameters exist
+                if (formData.find("RightAscension") == formData.end() || formData.find("Declination") == formData.end())
+                {
+                    sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
+                    return;
+                }
+
+                // Convert values to double
+                double ra = std::stod(formData["RightAscension"]);
+                double dec = std::stod(formData["Declination"]);
+
+                auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+                auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+                if (coordSet && eqCoord)
+                {
+                    // Set to TRACK mode
+                    INDI::PropertySwitch switchProperty(coordSet);
+                    switchProperty.reset();
+                    switchProperty[0].setState(ISS_ON);
+                    // Request to send the switch to the device
+                    requestNewSwitch(switchProperty);
+
+                    // Set coordinates
+                    INDI::PropertyNumber numberProperty(eqCoord);
+                    for (auto &num : numberProperty)
+                    {
+                        if (num.isNameMatch("RA"))
+                            num.setValue(ra);
+                        else if (num.isNameMatch("DEC"))
+                            num.setValue(dec);
+                    }
+                    // Request to send the coordinates to the device
+                    requestNewNumber(numberProperty);
+                    success = true;
+
+                    // Update target coordinates
+                    m_TargetRA = ra;
+                    m_TargetDEC = dec;
+                }
             }
-            // Request to send the coordinates to the device
-            requestNewNumber(numberProperty);
-            success = true;
-
-            // Update target coordinates
-            m_TargetRA = ra;
-            m_TargetDEC = dec;
-        }
-    }
-    catch (const std::exception &e)
-    {
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToCoordinates request: %s", e.what());
-    }
-
-    sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
+            catch (const std::exception &e)
+            {
+                DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToCoordinates request: %s", e.what());
+            }
+            sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
+    } 
 }
 
 void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res)
 {
-    // Same implementation as SlewToCoordinates for now
+    // Same implementation as SlewToCoordinates for now which is async in INDI
     handleSlewToCoordinates(req, res);
 }
 
 void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httplib::Response &res)
 {
-    bool success = false;
-    try
-    {
-        // Parse form-urlencoded data from request body
-        std::map<std::string, std::string> formData;
-        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
-
-        // Check if required parameters exist
-        if (formData.find("RightAscension") == formData.end() || formData.find("Declination") == formData.end())
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Cannot sync to coordinates when telescope is parked",1032); // ParkException
+    }   
+    else {
+        bool success = false;
+        try
         {
-            sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
-            return;
-        }
+            // Parse form-urlencoded data from request body
+            std::map<std::string, std::string> formData;
+            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
 
-        // Convert values to double
-        double ra = std::stod(formData["RightAscension"]);
-        double dec = std::stod(formData["Declination"]);
-
-        auto coordSet = m_Device.getSwitch("ON_COORD_SET");
-        auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
-        if (coordSet && eqCoord)
-        {
-            // Set to SYNC mode
-            INDI::PropertySwitch switchProperty(coordSet);
-            switchProperty.reset();
-            switchProperty[1].setState(ISS_ON);
-            // Request to send the switch to the device
-            requestNewSwitch(switchProperty);
-
-            // Set coordinates
-            INDI::PropertyNumber numberProperty(eqCoord);
-            for (auto &num : numberProperty)
+            // Check if required parameters exist
+            if (formData.find("RightAscension") == formData.end() || formData.find("Declination") == formData.end())
             {
-                if (num.isNameMatch("RA"))
-                    num.setValue(ra);
-                else if (num.isNameMatch("DEC"))
-                    num.setValue(dec);
+                sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
+                return;
             }
-            // Request to send the coordinates to the device
-            requestNewNumber(numberProperty);
-            success = true;
-        }
-    }
-    catch (const std::exception &e)
-    {
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SyncToCoordinates request: %s", e.what());
-    }
 
-    sendResponseStatus(res, success, success ? "" : "Failed to sync to coordinates");
+            // Convert values to double
+            double ra = std::stod(formData["RightAscension"]);
+            double dec = std::stod(formData["Declination"]);
+
+            auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+            auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+            if (coordSet && eqCoord)
+            {
+                // Set to SYNC mode
+                INDI::PropertySwitch switchProperty(coordSet);
+                switchProperty.reset();
+                switchProperty[1].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+
+                // Set coordinates
+                INDI::PropertyNumber numberProperty(eqCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("RA"))
+                        num.setValue(ra);
+                    else if (num.isNameMatch("DEC"))
+                        num.setValue(dec);
+                }
+                // Request to send the coordinates to the device
+                requestNewNumber(numberProperty);
+                success = true;
+            }
+        }
+        catch (const std::exception &e)
+        {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SyncToCoordinates request: %s", e.what());
+        }
+        sendResponseStatus(res, success, success ? "" : "Failed to sync to coordinates");
+    }
 }
 
 void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Response &res)
 {
-    bool success = false;
-    try
-    {
-        // Parse form-urlencoded data from request body
-        std::map<std::string, std::string> formData;
-        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
-
-        // Check if required parameters exist
-        if (formData.find("Direction") == formData.end() || formData.find("Duration") == formData.end())
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Pulse guide failed because telescope is parked",1032); // ParkException
+    }    
+    else {
+        bool success = false;
+        try
         {
-            sendResponseStatus(res, false, "Missing Direction or Duration parameter");
-            return;
-        }
+            // Parse form-urlencoded data from request body
+            std::map<std::string, std::string> formData;
+            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
 
-        // Convert values to integers
-        int direction = std::stoi(formData["Direction"]);
-        int duration = std::stoi(formData["Duration"]);
-
-        // Direction: 0=North, 1=South, 2=East, 3=West
-        if (direction == 0 || direction == 1)
-        {
-            auto guideNS = m_Device.getNumber("TELESCOPE_TIMED_GUIDE_NS");
-            if (guideNS)
+            // Check if required parameters exist
+            if (formData.find("Direction") == formData.end() || formData.find("Duration") == formData.end())
             {
-                INDI::PropertyNumber numberProperty(guideNS);
-                numberProperty[direction].setValue(duration);
-                // Request to send the guide command to the device
-                requestNewNumber(numberProperty);
-                success = true;
+                sendResponseStatus(res, false, "Missing Direction or Duration parameter");
+                return;
+            }
+
+            // Convert values to integers
+            int direction = std::stoi(formData["Direction"]);
+            int duration = std::stoi(formData["Duration"]);
+
+            // Direction: 0=North, 1=South, 2=East, 3=West
+            if (direction == 0 || direction == 1)
+            {
+                auto guideNS = m_Device.getNumber("TELESCOPE_TIMED_GUIDE_NS");
+                if (guideNS)
+                {
+                    INDI::PropertyNumber numberProperty(guideNS);
+                    numberProperty[direction].setValue(duration);
+                    // Request to send the guide command to the device
+                    requestNewNumber(numberProperty);
+                    success = true;
+                }
+            }
+            else if (direction == 2 || direction == 3)
+            {
+                auto guideWE = m_Device.getNumber("TELESCOPE_TIMED_GUIDE_WE");
+                if (guideWE)
+                {
+                    INDI::PropertyNumber numberProperty(guideWE);
+                    numberProperty[direction - 2].setValue(duration);
+                    // Request to send the guide command to the device
+                    requestNewNumber(numberProperty);
+                    success = true;
+                }
             }
         }
-        else if (direction == 2 || direction == 3)
+        catch (const std::exception &e)
         {
-            auto guideWE = m_Device.getNumber("TELESCOPE_TIMED_GUIDE_WE");
-            if (guideWE)
-            {
-                INDI::PropertyNumber numberProperty(guideWE);
-                numberProperty[direction - 2].setValue(duration);
-                // Request to send the guide command to the device
-                requestNewNumber(numberProperty);
-                success = true;
-            }
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse PulseGuide request: %s", e.what());
         }
+        sendResponseStatus(res, success, success ? "" : "Failed to pulse guide");
     }
-    catch (const std::exception &e)
-    {
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse PulseGuide request: %s", e.what());
-    }
-
-    sendResponseStatus(res, success, success ? "" : "Failed to pulse guide");
 }
 
 void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Response &res)
@@ -1033,46 +1054,58 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
         // Axis: 0=Primary (RA/AZ), 1=Secondary (DEC/ALT)
         if (axis == 0)
         {
-            auto motionWE = m_Device.getSwitch("TELESCOPE_MOTION_WE");
-            if (motionWE)
-            {
-                INDI::PropertySwitch switchProperty(motionWE);
-                switchProperty.reset();
-                if (rate > 0)
-                    switchProperty[0].setState(ISS_ON); // West
-                else if (rate < 0)
-                    switchProperty[1].setState(ISS_ON); // East
-                else
+            if (m_IsParked) {
+                sendResponseStatus(res,false,"Cannot move primary axis when telescope is parked",1032); // ParkException
+                return;
+            }          
+            else {
+                auto motionWE = m_Device.getSwitch("TELESCOPE_MOTION_WE");
+                if (motionWE)
                 {
-                    // If rate is 0, stop motion
-                    switchProperty[0].setState(ISS_OFF);
-                    switchProperty[1].setState(ISS_OFF);
+                    INDI::PropertySwitch switchProperty(motionWE);
+                    switchProperty.reset();
+                    if (rate > 0)
+                        switchProperty[0].setState(ISS_ON); // West
+                    else if (rate < 0)
+                        switchProperty[1].setState(ISS_ON); // East
+                    else
+                    {
+                        // If rate is 0, stop motion
+                        switchProperty[0].setState(ISS_OFF);
+                        switchProperty[1].setState(ISS_OFF);
+                    }
+                    // Request to send the switch to the device
+                    requestNewSwitch(switchProperty);
+                    success = true;
                 }
-                // Request to send the switch to the device
-                requestNewSwitch(switchProperty);
-                success = true;
-            }
+            }  
         }
         else if (axis == 1)
         {
-            auto motionNS = m_Device.getSwitch("TELESCOPE_MOTION_NS");
-            if (motionNS)
-            {
-                INDI::PropertySwitch switchProperty(motionNS);
-                switchProperty.reset();
-                if (rate > 0)
-                    switchProperty[0].setState(ISS_ON); // North
-                else if (rate < 0)
-                    switchProperty[1].setState(ISS_ON); // South
-                else
+            if (m_IsParked) {
+                sendResponseStatus(res,false,"Cannot move secondary axis when telescope is parked",1032); // ParkException
+                return;
+            }
+            else {
+                auto motionNS = m_Device.getSwitch("TELESCOPE_MOTION_NS");
+                if (motionNS)
                 {
-                    // If rate is 0, stop motion
-                    switchProperty[0].setState(ISS_OFF);
-                    switchProperty[1].setState(ISS_OFF);
+                    INDI::PropertySwitch switchProperty(motionNS);
+                    switchProperty.reset();
+                    if (rate > 0)
+                        switchProperty[0].setState(ISS_ON); // North
+                    else if (rate < 0)
+                        switchProperty[1].setState(ISS_ON); // South
+                    else
+                    {
+                        // If rate is 0, stop motion
+                        switchProperty[0].setState(ISS_OFF);
+                        switchProperty[1].setState(ISS_OFF);
+                    }
+                    // Request to send the switch to the device
+                    requestNewSwitch(switchProperty);
+                    success = true;
                 }
-                // Request to send the switch to the device
-                requestNewSwitch(switchProperty);
-                success = true;
             }
         }
     }
