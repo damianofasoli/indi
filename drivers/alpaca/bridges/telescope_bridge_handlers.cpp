@@ -342,8 +342,22 @@ void TelescopeBridge::handleCanUnpark(const httplib::Request &req, httplib::Resp
 
 void TelescopeBridge::handleCanMoveAxis(const httplib::Request &req, httplib::Response &res)
 {
-    INDI_UNUSED(req);
-    sendResponseValue(res, m_Device.getProperty("EQUATORIAL_EOD_COORD").isValid());
+       // Check if the Axis parameter exists in the query
+        auto axisIt = req.params.find("Axis");
+        if (axisIt == req.params.end())
+        {
+            sendResponseValue(res, json::array(), false, "Missing Axis parameter");
+            return;
+        }
+
+        // Convert Axis value to int
+        int axis = std::stoi(axisIt->second);
+
+        // Validate axis value (0 = Primary/RA/AZ, 1 = Secondary/DEC/ALT)
+        if (axis < 0 || axis > 1)
+            sendResponseValue(res, false);
+        else
+            sendResponseValue(res, m_Device.getProperty("EQUATORIAL_EOD_COORD").isValid());
 }
 
 void TelescopeBridge::handleCanSlewAsync(const httplib::Request &req, httplib::Response &res)
@@ -1051,7 +1065,7 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
             }
         }
 
-        // Axis: 0=Primary (RA/AZ), 1=Secondary (DEC/ALT)
+        // Axis: 0=Primary (RA/AZ), 1=Secondary (DEC/ALT), 2=Tertiary
         if (axis == 0)
         {
             if (m_IsParked) {
@@ -1108,6 +1122,14 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
                 }
             }
         }
+        else if (axis == 2){
+            sendResponseStatus(res,false,"Cannot move tertiary axis",1025); // InvalidValueException
+            return;
+        }
+        else {
+            sendResponseStatus(res,false,"Cannot move axis "+std::to_string(axis),1025); // InvalidValueException
+            return;
+        }
     }
     catch (const std::exception &e)
     {
@@ -1132,23 +1154,25 @@ void TelescopeBridge::handleAxisRates(const httplib::Request &req, httplib::Resp
         // Convert Axis value to int
         int axis = std::stoi(axisIt->second);
 
-        // Validate axis value (0 = Primary/RA/AZ, 1 = Secondary/DEC/ALT)
-        if (axis < 0 || axis > 1)
+        // Validate axis value (0 = Primary/RA/AZ, 1 = Secondary/DEC/ALT, 2 = Tertiary)
+        if (axis < 0 || axis > 2)
         {
-            sendResponseValue(res, json::array(), false, "Invalid Axis value. Must be 0 (Primary/RA/AZ) or 1 (Secondary/DEC/ALT)");
+            sendResponseStatus(res,false,"Invalid Axis value. Must be 0 (Primary/RA/AZ) or 1 (Secondary/DEC/ALT) or 2 (Tertiary)",1025); // InvalidValue Exception
             return;
         }
 
         // Create a JSON array of rate objects
         json ratesArray = json::array();
 
-        // 1x to 800x sidereal
-        // hardcoded for now
-        ratesArray.push_back(
-        {
-            {"Minimum", 0.00418}, // degrees/sec
-            {"Maximum", 3.344}
-        });
+        if (axis==0 || axis==1) {
+            // 1x to 800x sidereal
+            // hardcoded for now
+            ratesArray.push_back(
+            {
+                {"Minimum", 0.00418}, // degrees/sec
+                {"Maximum", 3.344}
+            });
+        } 
 
         // Send the response
         sendResponseValue(res, ratesArray);
