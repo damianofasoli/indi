@@ -939,6 +939,7 @@ void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Res
 void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Response &res)
 {
     bool success = false;
+    std::lock_guard<std::mutex> lock(m_Mutex);
     try
     {
         // Parse form-urlencoded data from request body
@@ -1078,15 +1079,20 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
                 {
                     INDI::PropertySwitch switchProperty(motionWE);
                     switchProperty.reset();
-                    if (rate > 0)
+                    if (rate > 0) {
                         switchProperty[0].setState(ISS_ON); // West
-                    else if (rate < 0)
+                        m_IsMotionSlewing=true;
+                    }
+                    else if (rate < 0) {
                         switchProperty[1].setState(ISS_ON); // East
+                        m_IsMotionSlewing=true;
+                    }
                     else
                     {
                         // If rate is 0, stop motion
                         switchProperty[0].setState(ISS_OFF);
                         switchProperty[1].setState(ISS_OFF);
+                        m_IsMotionSlewing=false;
                     }
                     // Request to send the switch to the device
                     requestNewSwitch(switchProperty);
@@ -1106,15 +1112,20 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
                 {
                     INDI::PropertySwitch switchProperty(motionNS);
                     switchProperty.reset();
-                    if (rate > 0)
+                    if (rate > 0) {
                         switchProperty[0].setState(ISS_ON); // North
-                    else if (rate < 0)
+                        m_IsMotionSlewing=true;
+                    }
+                    else if (rate < 0) {
                         switchProperty[1].setState(ISS_ON); // South
+                        m_IsMotionSlewing=true;
+                    }
                     else
                     {
                         // If rate is 0, stop motion
                         switchProperty[0].setState(ISS_OFF);
                         switchProperty[1].setState(ISS_OFF);
+                        m_IsMotionSlewing=false;
                     }
                     // Request to send the switch to the device
                     requestNewSwitch(switchProperty);
