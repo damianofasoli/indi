@@ -168,6 +168,9 @@ class TelescopeBridge : public IDeviceBridge
         INDI::BaseDevice m_Device;
         int m_DeviceNumber;
 
+        static constexpr double kAxisRateMin = 0.00418;
+        static constexpr double kAxisRateMax = 3.344;
+
         // Current state tracking
         double m_CurrentRA {0}, m_CurrentDEC {0};
         double m_CurrentAZ {0}, m_CurrentALT {0};

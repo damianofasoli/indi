@@ -957,6 +957,15 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
         int axis = std::stoi(formData["Axis"]);
         double rate = std::stod(formData["Rate"]);
 
+        // Check for invalid rates on primary and secondary axes      
+        if (axis==0 || axis==1) {
+            if ( (rate!=0.0) && (std::abs(rate)<kAxisRateMin || std::abs(rate)>kAxisRateMax) ) {
+                sendResponseStatus(res,false,"Axis rate is not valid: "+std::to_string(rate), 1025); // InvalidValueException
+                return;
+            }
+        }
+
+
         // Get the slew rate property
         auto slewRateSP = m_Device.getSwitch("TELESCOPE_SLEW_RATE");
 
@@ -1074,6 +1083,7 @@ void TelescopeBridge::handleMoveAxis(const httplib::Request &req, httplib::Respo
                 return;
             }          
             else {
+                
                 auto motionWE = m_Device.getSwitch("TELESCOPE_MOTION_WE");
                 if (motionWE)
                 {
@@ -1180,8 +1190,8 @@ void TelescopeBridge::handleAxisRates(const httplib::Request &req, httplib::Resp
             // hardcoded for now
             ratesArray.push_back(
             {
-                {"Minimum", 0.00418}, // degrees/sec
-                {"Maximum", 3.344}
+                {"Minimum", kAxisRateMin}, // degrees/sec
+                {"Maximum", kAxisRateMax}
             });
         } 
 
