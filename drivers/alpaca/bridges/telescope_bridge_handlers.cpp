@@ -312,7 +312,7 @@ void TelescopeBridge::handleCanSetPark(const httplib::Request &req, httplib::Res
 void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res, m_Device.getProperty("EQUATORIAL_EOD_COORD").isValid());
+    sendResponseValue(res, false); // Only Async, see Telescope V4 Alpaca specifications
 }
 
 void TelescopeBridge::handleCanFindHome(const httplib::Request &req, httplib::Response &res)
@@ -754,7 +754,12 @@ void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::R
     sendResponseValue(res,lst_alpaca); 
 }
 
-void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res)
+void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseStatus(res,false,"Can only slew async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
+}
+
+void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res)
 {
     if (m_IsParked) {
         sendResponseStatus(res,false,"Cannot slew to coordinates when telescope is parked",1032); // ParkException
@@ -777,6 +782,16 @@ void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httpl
                 // Convert values to double
                 double ra = std::stod(formData["RightAscension"]);
                 double dec = std::stod(formData["Declination"]);
+
+                if (ra<0.0 || ra>24.0) {
+                    sendResponseStatus(res, false, "Bad rigth ascension value: "+std::to_string(ra),1025); // InvalidValue exception
+                    return;
+                }
+
+                if (dec<-90.0 || dec>90.0) {
+                    sendResponseStatus(res, false, "Bad declination value: "+std::to_string(dec),1025); // InvalidValue exception
+                    return;
+                }
 
                 auto coordSet = m_Device.getSwitch("ON_COORD_SET");
                 auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
@@ -813,12 +828,6 @@ void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httpl
             }
             sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
     } 
-}
-
-void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res)
-{
-    // Same implementation as SlewToCoordinates for now which is async in INDI
-    handleSlewToCoordinates(req, res);
 }
 
 void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httplib::Response &res)
