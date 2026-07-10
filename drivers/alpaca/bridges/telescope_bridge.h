@@ -89,7 +89,7 @@ class TelescopeBridge : public IDeviceBridge
         void handleCanSync(const httplib::Request &req, httplib::Response &res);
         void handleCanSyncAltAz(const httplib::Request &req, httplib::Response &res);
         void handleCanUnpark(const httplib::Request &req, httplib::Response &res);
-        void handleDeclination(const httplib::Request &req, httplib::Response &res);
+        void handleDeclination(const httplib::Request &req, httplib::Response &res);     
         void handleDeclinationRate(const httplib::Request &req, httplib::Response &res);
         void handleDestinationSideOfPier(const httplib::Request &req, httplib::Response &res);
         void handleDoesRefraction(const httplib::Request &req, httplib::Response &res);
@@ -175,6 +175,8 @@ class TelescopeBridge : public IDeviceBridge
         double m_CurrentRA {0}, m_CurrentDEC {0};
         double m_CurrentAZ {0}, m_CurrentALT {0};
         double m_TargetRA {0}, m_TargetDEC {0};
+        bool m_IsTargetRASet {false};
+        bool m_IsTargetDecSet {false};        
         double m_RightAscensionRate {0}, m_DeclinationRate {0};
         double m_RightAscensionRateAlpaca {0.0}, m_DeclinationRateAlpaca {0.0};
         bool m_IsTracking {false};
