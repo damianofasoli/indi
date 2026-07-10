@@ -129,6 +129,8 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                     // Request to send the switch to the device
                     requestNewSwitch(switchProperty);
                     isConnectedAlpaca=true;
+                    m_IsTargetRASet=false; // reset
+                    m_IsTargetDecSet=false; // reset
                     sendResponseValue(res, true);
                 }
                 else
@@ -167,6 +169,10 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
             {
                 // No change needed, return Alpaca connected value as in request
                 isConnectedAlpaca=connected;
+                if (isConnectedAlpaca) {
+                    m_IsTargetRASet=false; // reset
+                    m_IsTargetDecSet=false; // reset                    
+                }
                 sendResponseValue(res, connected);
             }
         }
@@ -385,6 +391,82 @@ void TelescopeBridge::handleDeclination(const httplib::Request &req, httplib::Re
     sendResponseValue(res, m_CurrentDEC);    
 }
 
+void TelescopeBridge::handleTargetDeclination(const httplib::Request &req, httplib::Response &res)
+{
+    bool success = false;
+    if (req.method=="PUT") {
+        try
+        {
+            std::map<std::string, std::string> formData;
+            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+            // Check if required parameters exist
+            if (formData.find("TargetDeclination") == formData.end())
+            {
+                sendResponseStatus(res, false, "Missing TargetDeclination parameter");
+                return;
+            }
+            else {
+                // Convert values to double
+                double dec = std::stod(formData["TargetDeclination"]);
+
+                if (dec<-90.0 || dec>90.0) {
+                    sendResponseStatus(res, false, "Bad declination value: "+std::to_string(dec),1025); // InvalidValue exception
+                    return;
+                }
+
+                auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+                if (eqTargetCoord)
+                {
+                    // Set target coordinates
+                    INDI::PropertyNumber numberProperty(eqTargetCoord);
+                    for (auto &num : numberProperty)
+                    {
+                        if (num.isNameMatch("DEC"))
+                            num.setValue(dec);
+                    }
+                    // Request to send the coordinates to the device
+                    requestNewNumber(numberProperty);
+                    m_IsTargetDecSet = true;
+                    success = true;
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse TargetDeclination request: %s", e.what());
+        }
+        sendResponseStatus(res, success, success ? "" : "Failed to set target declination");
+    }
+    else {
+        // GET
+        if (m_IsTargetDecSet) {
+            double dec1 = 0.0;
+            auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+            if (eqTargetCoord)
+            {
+                INDI::PropertyNumber numberProperty(eqTargetCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("DEC")) {
+                        dec1 = num.getValue();
+                        success=true;
+                    }
+                }            
+            }   
+            if (success) {
+                sendResponseValue(res, dec1);
+            }   
+            else {
+                sendResponseStatus(res, false, "Failed to get target declination");
+            }  
+        }
+        else {
+            sendResponseStatus(res, false, "Target declination was not set before",1035); //InvalidOperationException
+        }
+    }
+}
+
 void TelescopeBridge::handleDeclinationRate(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
@@ -397,6 +479,82 @@ void TelescopeBridge::handleRightAscension(const httplib::Request &req, httplib:
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
     sendResponseValue(res, m_CurrentRA);       
+}
+
+void TelescopeBridge::handleTargetRightAscension(const httplib::Request &req, httplib::Response &res) 
+{
+    bool success = false;
+    if (req.method=="PUT") {
+        try
+        {
+            std::map<std::string, std::string> formData;
+            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+            // Check if required parameters exist
+            if (formData.find("TargetRightAscension") == formData.end())
+            {
+                sendResponseStatus(res, false, "Missing TargetRightAscension parameter");
+                return;
+            }
+            else {
+                // Convert values to double
+                double ra = std::stod(formData["TargetRightAscension"]);
+
+                if (ra<0.0 || ra>24.0) {
+                    sendResponseStatus(res, false, "Bad rigth ascension value: "+std::to_string(ra),1025); // InvalidValue exception
+                    return;
+                }
+
+                auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+                if (eqTargetCoord)
+                {
+                    // Set target coordinates
+                    INDI::PropertyNumber numberProperty(eqTargetCoord);
+                    for (auto &num : numberProperty)
+                    {
+                        if (num.isNameMatch("RA"))
+                            num.setValue(ra);
+                    }
+                    // Request to send the coordinates to the device
+                    requestNewNumber(numberProperty);
+                    m_IsTargetRASet = true;
+                    success = true;
+                }
+            }
+        }
+        catch (const std::exception &e)
+        {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse TargetRightAscension request: %s", e.what());
+        }
+        sendResponseStatus(res, success, success ? "" : "Failed to set target right ascension");
+    }
+    else {
+        // GET
+        if (m_IsTargetRASet) {
+            double ra1 = 0.0;
+            auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+            if (eqTargetCoord)
+            {
+                INDI::PropertyNumber numberProperty(eqTargetCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("RA")) {
+                        ra1 = num.getValue();
+                        success=true;
+                    }
+                }            
+            }   
+            if (success) {
+                sendResponseValue(res, ra1);
+            }   
+            else {
+                sendResponseStatus(res, false, "Failed to get target right ascension");
+            }  
+        }
+        else {
+            sendResponseStatus(res, false, "Target right ascension was not set before",1035); //InvalidOperationException            
+        }
+    }
 }
 
 void TelescopeBridge::handleRightAscensionRate(const httplib::Request &req, httplib::Response &res)
@@ -761,6 +919,7 @@ void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httpl
 
 void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res)
 {
+    std::lock_guard<std::mutex> lock(m_Mutex);    
     if (m_IsParked) {
         sendResponseStatus(res,false,"Cannot slew to coordinates when telescope is parked",1032); // ParkException
     }   
@@ -797,6 +956,7 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                 auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
                 if (coordSet && eqCoord)
                 {
+                
                     // Set to TRACK mode
                     INDI::PropertySwitch switchProperty(coordSet);
                     switchProperty.reset();
@@ -804,7 +964,7 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                     // Request to send the switch to the device
                     requestNewSwitch(switchProperty);
 
-                    // Set coordinates
+                    // Set coordinates                
                     INDI::PropertyNumber numberProperty(eqCoord);
                     for (auto &num : numberProperty)
                     {
@@ -815,6 +975,7 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                     }
                     // Request to send the coordinates to the device
                     requestNewNumber(numberProperty);
+                    m_IsCoordsSlewing=true;
                     success = true;
 
                     // Update target coordinates

@@ -118,6 +118,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleCanSetGuideRates(req, res);
     else if (method == "declination")
         handleDeclination(req, res);
+    else if (method == "targetdeclination")
+        handleTargetDeclination(req, res);        
     else if (method == "declinationrate") {
         if (req.method=="PUT") 
             handleSetDeclinationRate(req, res);
@@ -128,6 +130,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleSetDeclinationRate(req, res);
     else if (method == "rightascension")
         handleRightAscension(req, res);
+    else if (method == "targetrightascension")
+        handleTargetRightAscension(req, res);
     else if (method == "rightascensionrate") {
         if (req.method=="PUT") 
             handleSetRightAscensionRate(req, res);
