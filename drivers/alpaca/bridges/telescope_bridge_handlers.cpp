@@ -914,7 +914,7 @@ void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::R
 
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res) {
     INDI_UNUSED(req);
-    sendResponseStatus(res,false,"Can only slew async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
+    sendResponseStatus(res,false,"Can only slew to coordinates async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
 }
 
 void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res)
@@ -1009,6 +1009,71 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
             }
             sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
     } 
+}
+
+void TelescopeBridge::handleSlewToTarget(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseStatus(res,false,"Can only slew to target async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
+}
+
+void TelescopeBridge::handleSlewToTargetAsync(const httplib::Request &req, httplib::Response &res) {
+
+    INDI_UNUSED(req);
+    int successlevel=0;
+    double ra=0.0, dec=0.0;
+
+    auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+    if (eqTargetCoord)
+    {
+        INDI::PropertyNumber numberProperty(eqTargetCoord);
+        for (auto &num : numberProperty)
+        {
+            if (num.isNameMatch("RA")) {
+                ra = num.getValue();
+                successlevel++;
+            }
+            else if (num.isNameMatch("DEC")) {
+                dec = num.getValue();
+                successlevel++;
+            }
+        }            
+    }   
+    
+    if (successlevel==2) {
+
+        bool success = false;
+        auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+        auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+        if (coordSet && eqCoord)
+        {
+
+            // Set to TRACK mode
+            INDI::PropertySwitch switchProperty(coordSet);
+            switchProperty.reset();
+            switchProperty[0].setState(ISS_ON);
+            // Request to send the switch to the device
+            requestNewSwitch(switchProperty);
+
+            // Set coordinates                
+            INDI::PropertyNumber numberProperty(eqCoord);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("RA"))
+                    num.setValue(ra);
+                else if (num.isNameMatch("DEC"))
+                    num.setValue(dec);
+            }
+            // Request to send the coordinates to the device
+            requestNewNumber(numberProperty);
+            m_IsCoordsSlewing=true;
+            success = true;
+
+        }
+        sendResponseStatus(res, success, success ? "" : "Failed to slew to target"); 
+    }   
+    else {
+        sendResponseStatus(res, false, "Failed to get target right ascension or target declination");
+    }  
 }
 
 void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httplib::Response &res)
