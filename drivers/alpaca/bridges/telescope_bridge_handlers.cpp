@@ -956,7 +956,29 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                 auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
                 if (coordSet && eqCoord)
                 {
-                
+
+                    // Update target coordinates
+                    auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+                    if (eqTargetCoord)
+                    {
+                        INDI::PropertyNumber numberProperty(eqTargetCoord);
+                        for (auto &num : numberProperty)
+                        {
+                            if (num.isNameMatch("RA")) {
+                                num.setValue(ra);       
+                                m_IsTargetRASet=true;                     
+                            }                                                         
+                            else if (num.isNameMatch("DEC")) {
+                                num.setValue(dec);
+                                m_IsTargetDecSet = true;
+                            }
+                                
+                        }
+                        // Request to send the coordinates to the device
+                        requestNewNumber(numberProperty);
+                    }                    
+                    
+
                     // Set to TRACK mode
                     INDI::PropertySwitch switchProperty(coordSet);
                     switchProperty.reset();
@@ -978,9 +1000,7 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                     m_IsCoordsSlewing=true;
                     success = true;
 
-                    // Update target coordinates
-                    m_TargetRA = ra;
-                    m_TargetDEC = dec;
+
                 }
             }
             catch (const std::exception &e)
