@@ -1018,62 +1018,70 @@ void TelescopeBridge::handleSlewToTarget(const httplib::Request &req, httplib::R
 
 void TelescopeBridge::handleSlewToTargetAsync(const httplib::Request &req, httplib::Response &res) {
 
-    INDI_UNUSED(req);
-    int successlevel=0;
-    double ra=0.0, dec=0.0;
-
-    auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
-    if (eqTargetCoord)
-    {
-        INDI::PropertyNumber numberProperty(eqTargetCoord);
-        for (auto &num : numberProperty)
-        {
-            if (num.isNameMatch("RA")) {
-                ra = num.getValue();
-                successlevel++;
-            }
-            else if (num.isNameMatch("DEC")) {
-                dec = num.getValue();
-                successlevel++;
-            }
-        }            
-    }   
-    
-    if (successlevel==2) {
-
-        bool success = false;
-        auto coordSet = m_Device.getSwitch("ON_COORD_SET");
-        auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
-        if (coordSet && eqCoord)
-        {
-
-            // Set to TRACK mode
-            INDI::PropertySwitch switchProperty(coordSet);
-            switchProperty.reset();
-            switchProperty[0].setState(ISS_ON);
-            // Request to send the switch to the device
-            requestNewSwitch(switchProperty);
-
-            // Set coordinates                
-            INDI::PropertyNumber numberProperty(eqCoord);
-            for (auto &num : numberProperty)
-            {
-                if (num.isNameMatch("RA"))
-                    num.setValue(ra);
-                else if (num.isNameMatch("DEC"))
-                    num.setValue(dec);
-            }
-            // Request to send the coordinates to the device
-            requestNewNumber(numberProperty);
-            m_IsCoordsSlewing=true;
-            success = true;
-
-        }
-        sendResponseStatus(res, success, success ? "" : "Failed to slew to target"); 
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Cannot slew to target when telescope is parked",1032); // ParkException
     }   
     else {
-        sendResponseStatus(res, false, "Failed to get target right ascension or target declination");
-    }  
+
+        INDI_UNUSED(req);
+        int successlevel=0;
+        double ra=0.0, dec=0.0;
+
+        auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+        if (eqTargetCoord)
+        {
+            INDI::PropertyNumber numberProperty(eqTargetCoord);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("RA")) {
+                    ra = num.getValue();
+                    successlevel++;
+                }
+                else if (num.isNameMatch("DEC")) {
+                    dec = num.getValue();
+                    successlevel++;
+                }
+            }            
+        }   
+        
+        if (successlevel==2) {
+
+            bool success = false;
+            auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+            auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+            if (coordSet && eqCoord)
+            {
+
+                // Set to TRACK mode
+                INDI::PropertySwitch switchProperty(coordSet);
+                switchProperty.reset();
+                switchProperty[0].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+
+                // Set coordinates                
+                INDI::PropertyNumber numberProperty(eqCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("RA"))
+                        num.setValue(ra);
+                    else if (num.isNameMatch("DEC"))
+                        num.setValue(dec);
+                }
+                // Request to send the coordinates to the device
+                requestNewNumber(numberProperty);
+                m_IsCoordsSlewing=true;
+                success = true;
+
+            }
+            sendResponseStatus(res, success, success ? "" : "Failed to slew to target"); 
+        }   
+        else {
+            sendResponseStatus(res, false, "Failed to get target right ascension or target declination");
+        }  
+
+    }
+
 }
 
 void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httplib::Response &res)
@@ -1100,6 +1108,16 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
             double ra = std::stod(formData["RightAscension"]);
             double dec = std::stod(formData["Declination"]);
 
+            if (ra<0.0 || ra>24.0) {
+                sendResponseStatus(res, false, "Bad rigth ascension value: "+std::to_string(ra),1025); // InvalidValue exception
+                return;
+            }
+
+            if (dec<-90.0 || dec>90.0) {
+                sendResponseStatus(res, false, "Bad declination value: "+std::to_string(dec),1025); // InvalidValue exception
+                return;
+            }
+
             auto coordSet = m_Device.getSwitch("ON_COORD_SET");
             auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
             if (coordSet && eqCoord)
@@ -1107,7 +1125,7 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
                 // Set to SYNC mode
                 INDI::PropertySwitch switchProperty(coordSet);
                 switchProperty.reset();
-                switchProperty[1].setState(ISS_ON);
+                switchProperty[2].setState(ISS_ON);
                 // Request to send the switch to the device
                 requestNewSwitch(switchProperty);
 
@@ -1131,6 +1149,75 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
         }
         sendResponseStatus(res, success, success ? "" : "Failed to sync to coordinates");
     }
+}
+
+void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::Response &res) 
+{
+
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Cannot sync to target when telescope is parked",1032); // ParkException
+    }   
+    else {
+
+        INDI_UNUSED(req);
+        int successlevel=0;
+        double ra=0.0, dec=0.0;
+
+        auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+        if (eqTargetCoord)
+        {
+            INDI::PropertyNumber numberProperty(eqTargetCoord);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("RA")) {
+                    ra = num.getValue();
+                    successlevel++;
+                }
+                else if (num.isNameMatch("DEC")) {
+                    dec = num.getValue();
+                    successlevel++;
+                }
+            }            
+        }   
+        
+        if (successlevel==2) {
+
+            bool success = false;
+            auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+            auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+            if (coordSet && eqCoord)
+            {
+
+                // Set to SYNC mode
+                INDI::PropertySwitch switchProperty(coordSet);
+                switchProperty.reset();
+                switchProperty[2].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+
+                // Set coordinates                
+                INDI::PropertyNumber numberProperty(eqCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("RA"))
+                        num.setValue(ra);
+                    else if (num.isNameMatch("DEC"))
+                        num.setValue(dec);
+                }
+                // Request to send the coordinates to the device
+                requestNewNumber(numberProperty);
+                success = true;
+
+            }
+            sendResponseStatus(res, success, success ? "" : "Failed to sync to target"); 
+        }   
+        else {
+            sendResponseStatus(res, false, "Failed to get target right ascension or target declination");
+        }  
+
+    }
+
+
 }
 
 void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Response &res)

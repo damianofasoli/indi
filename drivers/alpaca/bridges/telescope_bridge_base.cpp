@@ -189,6 +189,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleSlewToTargetAsync(req, res);
     else if (method == "synctocoordinates")
         handleSyncToCoordinates(req, res);
+    else if (method == "synctotarget")
+        handleSyncToTarget(req, res);        
     else if (method == "pulseguide")
         handlePulseGuide(req, res);
     else if (method == "moveaxis")
