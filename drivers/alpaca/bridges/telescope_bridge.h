@@ -174,7 +174,6 @@ class TelescopeBridge : public IDeviceBridge
         // Current state tracking
         double m_CurrentRA {0}, m_CurrentDEC {0};
         double m_CurrentAZ {0}, m_CurrentALT {0};
-        double m_TargetRA {0}, m_TargetDEC {0};
         bool m_IsTargetRASet {false};
         bool m_IsTargetDecSet {false};        
         double m_RightAscensionRate {0}, m_DeclinationRate {0};
