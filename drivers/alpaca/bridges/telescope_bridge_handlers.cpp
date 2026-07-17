@@ -802,8 +802,11 @@ void TelescopeBridge::handleFindHome(const httplib::Request &req, httplib::Respo
                 requestNewSwitch(switchProperty);
                 success = true;
             }
+            sendResponseStatus(res, success, success ? "" : "Failed to send to home telescope");  
         }
-        sendResponseStatus(res, success, success ? "" : "Failed to send to home telescope");    
+        else {
+            sendResponseStatus(res, success, success ? "" : "FindHome is not supported by telescope",1024);  // Not implemented exception
+        }  
     }
 }
 
@@ -1091,6 +1094,7 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
     }   
     else {
         bool success = false;
+        std::string failMessage="";
         try
         {
             // Parse form-urlencoded data from request body
@@ -1118,6 +1122,27 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
                 return;
             }
 
+            // Update target coordinates
+            auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+            if (eqTargetCoord)
+            {
+                INDI::PropertyNumber numberProperty(eqTargetCoord);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("RA")) {
+                        num.setValue(ra);       
+                        m_IsTargetRASet=true;                     
+                    }                                                         
+                    else if (num.isNameMatch("DEC")) {
+                        num.setValue(dec);
+                        m_IsTargetDecSet = true;
+                    }
+                        
+                }
+                // Request to send the coordinates to the device
+                requestNewNumber(numberProperty);
+            } 
+
             auto coordSet = m_Device.getSwitch("ON_COORD_SET");
             auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
             if (coordSet && eqCoord)
@@ -1133,27 +1158,72 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
                 INDI::PropertyNumber numberProperty(eqCoord);
                 for (auto &num : numberProperty)
                 {
-                    if (num.isNameMatch("RA"))
+                    if (num.isNameMatch("RA")) {
                         num.setValue(ra);
-                    else if (num.isNameMatch("DEC"))
+                    }                        
+                    else if (num.isNameMatch("DEC")) {
                         num.setValue(dec);
+                    }
+                        
                 }
                 // Request to send the coordinates to the device
                 requestNewNumber(numberProperty);
+
                 success = true;
+
+                auto waitInterval = std::chrono::milliseconds(200);
+                std::this_thread::sleep_for(waitInterval);
+                //SyncWait(success, numberProperty, failMessage);
             }
         }
         catch (const std::exception &e)
         {
             DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SyncToCoordinates request: %s", e.what());
         }
-        sendResponseStatus(res, success, success ? "" : "Failed to sync to coordinates");
+
+        sendResponseStatus(res, success, success ? "" : "Failed to sync to coordinates" + (failMessage=="" ? "" : ", " + failMessage));
     }
 }
 
+// void TelescopeBridge::SyncWait(bool &success, INDI::PropertyNumber &eqCoord, std::string &failMessage)
+// {
+//     // sync wait
+//     auto startTime = std::chrono::steady_clock::now();
+//     auto timeout = std::chrono::seconds(5);
+//     auto pollInterval = std::chrono::milliseconds(50);
+//     bool waitAgain = true;
+//     std::this_thread::sleep_for(pollInterval); // time to have state set to IPS_BUSY
+//     while (success && waitAgain)
+//     {
+//         IPState currentState = eqCoord.getState();
+//         if (currentState == IPS_OK)
+//         {
+//             waitAgain = false;
+//         }
+//         else if (currentState == IPS_ALERT)
+//         {
+//             failMessage = "Indi sync failed";
+//             success = false;
+//         }
+//         else
+//         {
+//             // Check Timeout
+//             auto elapsedTime = std::chrono::steady_clock::now() - startTime;
+//             if (elapsedTime > timeout)
+//             {
+//                 success = false;
+//                 failMessage = "Indi sync not completed, timeout";
+//             }
+//             else
+//             {
+//                 std::this_thread::sleep_for(pollInterval);
+//             }
+//         }
+//     }
+// }
+
 void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::Response &res) 
 {
-
     if (m_IsParked) {
         sendResponseStatus(res,false,"Cannot sync to target when telescope is parked",1032); // ParkException
     }   
@@ -1183,6 +1253,7 @@ void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::R
         if (successlevel==2) {
 
             bool success = false;
+            std::string failMessage="";
             auto coordSet = m_Device.getSwitch("ON_COORD_SET");
             auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
             if (coordSet && eqCoord)
@@ -1199,17 +1270,27 @@ void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::R
                 INDI::PropertyNumber numberProperty(eqCoord);
                 for (auto &num : numberProperty)
                 {
-                    if (num.isNameMatch("RA"))
+                    if (num.isNameMatch("RA")) {
                         num.setValue(ra);
-                    else if (num.isNameMatch("DEC"))
+                    }
+                        
+                    else if (num.isNameMatch("DEC")) {
                         num.setValue(dec);
+                    }
+                        
                 }
                 // Request to send the coordinates to the device
                 requestNewNumber(numberProperty);
+
                 success = true;
 
+                auto waitInterval = std::chrono::milliseconds(200);
+                std::this_thread::sleep_for(waitInterval);
+                //SyncWait(success, numberProperty, failMessage);
+
+
             }
-            sendResponseStatus(res, success, success ? "" : "Failed to sync to target"); 
+            sendResponseStatus(res, success, success ? "" : "Failed to sync to target" + (failMessage=="" ? "" : ", " + failMessage));
         }   
         else {
             sendResponseStatus(res, false, "Failed to get target right ascension or target declination");
