@@ -315,6 +315,11 @@ void TelescopeBridge::handleCanSetPark(const httplib::Request &req, httplib::Res
     sendResponseValue(res, m_Device.getProperty("TELESCOPE_PARK_OPTION").isValid()); 
 }
 
+void TelescopeBridge::handleCanSetPierSide(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseValue(res, m_Device.getProperty("TARGETPIERSIDE").isValid()); 
+}
+
 void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
