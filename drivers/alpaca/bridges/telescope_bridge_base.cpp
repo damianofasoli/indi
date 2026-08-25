@@ -94,6 +94,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleCanUnpark(req, res);
     else if (method == "cansetpark") 
         handleCanSetPark(req,res);
+    else if (method == "cansetpierside") 
+        handleCanSetPierSide(req,res);
     else if (method == "canpulseguide")
         handleCanPulseGuide(req, res);
     else if (method == "cansettracking")
