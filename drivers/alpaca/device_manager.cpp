@@ -758,9 +758,16 @@ void DeviceManager::handleManagementRequest(const std::string &endpoint,
     else if (endpoint == "v1/description")
     {
         // Return server description
+        json value =
+        {
+            {"ServerName", "INDI Alpaca Server"},
+            {"Manufacturer", "INDI"},
+            {"ManufacturerVersion", "."},
+            {"Location", "Not set"}
+        }; 
         json response =
         {
-            {"Value", "INDI Alpaca Server"},
+            {"Value", value},
             {"ClientTransactionID", clientTransactionID},
             {"ServerTransactionID", serverTransactionID},
             {"ErrorNumber", 0},
