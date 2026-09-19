@@ -106,14 +106,18 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleCanSetDeclinationRate(req, res);
     else if (method == "canslew")
         handleCanSlew(req, res);
-    else if (method == "canmoveaxis")
-        handleCanMoveAxis(req, res);
     else if (method == "canslewasync")
         handleCanSlewAsync(req, res);
+    else if (method == "canslewaltaz")
+        handleCanSlewAltAz(req, res);        
     else if (method == "canslewaltazasync")
-        handleCanSlewAltAzAsync(req, res);
+        handleCanSlewAltAzAsync(req, res);        
+    else if (method == "canmoveaxis")
+        handleCanMoveAxis(req, res);
     else if (method == "cansync")
         handleCanSync(req, res);
+    else if (method == "cansyncaltaz")
+        handleCanSyncAltAz(req, res);
     else if (method == "canfindhome")
         handleCanFindHome(req, res);
     else if (method == "cansetguiderates")
