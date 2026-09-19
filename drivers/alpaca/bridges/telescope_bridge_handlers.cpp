@@ -326,6 +326,12 @@ void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Respon
     sendResponseValue(res, false); // Only Async, see Telescope V4 Alpaca specifications
 }
 
+void TelescopeBridge::handleCanSlewAltAz(const httplib::Request &req, httplib::Response &res) 
+{
+    INDI_UNUSED(req);
+    sendResponseValue(res, false); // Only Async, see Telescope V4 Alpaca specifications
+}
+
 void TelescopeBridge::handleCanFindHome(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
@@ -380,13 +386,18 @@ void TelescopeBridge::handleCanSlewAsync(const httplib::Request &req, httplib::R
 void TelescopeBridge::handleCanSlewAltAzAsync(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res, m_Device.getProperty("HORIZONTAL_COORD").isValid());
+    sendResponseValue(res,false); 
 }
 
 void TelescopeBridge::handleCanSync(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
     sendResponseValue(res, m_Device.getProperty("ON_COORD_SET").isValid());
+}
+
+void TelescopeBridge::handleCanSyncAltAz(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseValue(res, false); // SyncAltAz is not supported
 }
 
 void TelescopeBridge::handleDeclination(const httplib::Request &req, httplib::Response &res)
