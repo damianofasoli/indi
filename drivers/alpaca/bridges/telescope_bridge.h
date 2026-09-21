@@ -181,7 +181,8 @@ class TelescopeBridge : public IDeviceBridge
         double m_RightAscensionRateAlpaca {0.0}, m_DeclinationRateAlpaca {0.0};
         bool m_IsTracking {false};
         bool m_IsParked {false};
-        bool m_IsCoordsSlewing {false};
+        bool m_IsEqCoordsSlewing {false};
+        bool m_IsHoCoordsSlewing {false};
         bool m_IsMotionSlewing {false};        
         int m_PierSide {0};
         bool m_IsAtHome {true};
