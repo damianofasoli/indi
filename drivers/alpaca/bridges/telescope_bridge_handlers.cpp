@@ -386,7 +386,8 @@ void TelescopeBridge::handleCanSlewAsync(const httplib::Request &req, httplib::R
 void TelescopeBridge::handleCanSlewAltAzAsync(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res,false); 
+    //sendResponseValue(res,m_Device.getProperty("HORIZONTAL_COORD").isValid());
+    sendResponseValue(res, false); // SlewAltAzAsync is not supported 
 }
 
 void TelescopeBridge::handleCanSync(const httplib::Request &req, httplib::Response &res)
@@ -591,7 +592,7 @@ void TelescopeBridge::handleSlewing(const httplib::Request &req, httplib::Respon
 {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_IsMotionSlewing || m_IsCoordsSlewing);
+    sendResponseValue(res, m_IsMotionSlewing || m_IsEqCoordsSlewing || m_IsHoCoordsSlewing);
 }
 
 void TelescopeBridge::handleTracking(const httplib::Request &req, httplib::Response &res)
@@ -1016,7 +1017,7 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                     }
                     // Request to send the coordinates to the device
                     requestNewNumber(numberProperty);
-                    m_IsCoordsSlewing=true;
+                    m_IsEqCoordsSlewing=true;
                     success = true;
 
 
@@ -1024,11 +1025,12 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
             }
             catch (const std::exception &e)
             {
-                DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToCoordinates request: %s", e.what());
+                DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToCoordinatesAsync request: %s", e.what());
             }
             sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
     } 
 }
+
 
 void TelescopeBridge::handleSlewToTarget(const httplib::Request &req, httplib::Response &res) {
     INDI_UNUSED(req);
@@ -1089,7 +1091,7 @@ void TelescopeBridge::handleSlewToTargetAsync(const httplib::Request &req, httpl
                 }
                 // Request to send the coordinates to the device
                 requestNewNumber(numberProperty);
-                m_IsCoordsSlewing=true;
+                m_IsEqCoordsSlewing=true;
                 success = true;
 
             }
@@ -1316,6 +1318,80 @@ void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::R
 
 
 }
+
+void TelescopeBridge::handleSlewToAltAz(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    sendResponseStatus(res,false,"Can only slew to altitude and azimuth async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
+}
+
+void TelescopeBridge::handleSlewToAltAzAsync(const httplib::Request &req, httplib::Response &res)
+{
+    std::lock_guard<std::mutex> lock(m_Mutex);   
+    
+    sendResponseStatus(res,false,"Cannot slew to altitude and azimuth (read only values)",1024); // NotImplementedException  
+    return;    
+
+    if (m_IsParked) {
+        sendResponseStatus(res,false,"Cannot slew to altitude and azimuth when telescope is parked",1032); // ParkException
+    }   
+    else {
+            bool success = false;
+            try
+            {
+                // Parse form-urlencoded data from request body
+                std::map<std::string, std::string> formData;
+                DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+                // Check if required parameters exist
+                if (formData.find("Azimuth") == formData.end() || formData.find("Altitude") == formData.end())
+                {
+                    sendResponseStatus(res, false, "Missing Azimuth or Altitude parameter");
+                    return;
+                }
+
+                // Convert values to double
+                double az = std::stod(formData["Azimuth"]);
+                double alt = std::stod(formData["Altitude"]);
+
+                // if (ra<0.0 || ra>24.0) {
+                //     sendResponseStatus(res, false, "Bad rigth ascension value: "+std::to_string(ra),1025); // InvalidValue exception
+                //     return;
+                // }
+
+                // if (dec<-90.0 || dec>90.0) {
+                //     sendResponseStatus(res, false, "Bad declination value: "+std::to_string(dec),1025); // InvalidValue exception
+                //     return;
+                // }
+
+                auto hoCoord = m_Device.getNumber("HORIZONTAL_COORD");
+                if (hoCoord)
+                {
+
+                    // Set coordinates                
+                    INDI::PropertyNumber numberProperty(hoCoord);
+                    for (auto &num : numberProperty)
+                    {
+                        if (num.isNameMatch("AZ"))
+                            num.setValue(az);
+                        else if (num.isNameMatch("ALT"))
+                            num.setValue(alt);
+                    }
+                    // Request to send the coordinates to the device
+                    requestNewNumber(numberProperty);
+                    m_IsHoCoordsSlewing=true;
+                    success = true;
+
+
+                }
+            }
+            catch (const std::exception &e)
+            {
+                DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToAltAzAsync request: %s", e.what());
+            }
+            sendResponseStatus(res, success, success ? "" : "Failed to slew to horizontal coordinates");
+    } 
+}
+
 
 void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Response &res)
 {

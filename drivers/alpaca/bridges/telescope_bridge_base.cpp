@@ -196,7 +196,11 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
     else if (method == "synctocoordinates")
         handleSyncToCoordinates(req, res);
     else if (method == "synctotarget")
-        handleSyncToTarget(req, res);        
+        handleSyncToTarget(req, res); 
+    else if (method == "slewtoaltaz")
+        handleSlewToAltAz(req, res);               
+   else if (method == "slewtoaltazasync")
+        handleSlewToAltAzAsync(req, res);               
     else if (method == "pulseguide")
         handlePulseGuide(req, res);
     else if (method == "moveaxis")
@@ -234,8 +238,8 @@ void TelescopeBridge::updateProperty(INDI::Property property)
     // Update telescope state based on property updates
     if (property.isNameMatch("EQUATORIAL_EOD_COORD"))
     {      
-        m_IsCoordsSlewing = (property.getState() == IPS_BUSY);
-        if (m_IsCoordsSlewing) {
+        m_IsEqCoordsSlewing = (property.getState() == IPS_BUSY);
+        if (m_IsEqCoordsSlewing) {
             DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC skipped, coords slewing: %f, %f", m_CurrentRA, m_CurrentDEC); 
         }
         else if (m_IsMotionSlewing) {
@@ -260,16 +264,25 @@ void TelescopeBridge::updateProperty(INDI::Property property)
     }
     else if (property.isNameMatch("HORIZONTAL_COORD"))
     {
-        // Update AZ/ALT
-        INDI::PropertyNumber numberProperty(property);
-        for (auto &num : numberProperty)
-        {
-            if (num.isNameMatch("AZ"))
-                m_CurrentAZ = num.getValue();
-            else if (num.isNameMatch("ALT"))
-                m_CurrentALT = num.getValue();
+        m_IsHoCoordsSlewing = (property.getState() == IPS_BUSY);
+        if (m_IsHoCoordsSlewing) {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated AZ/ALT skipped, coords slewing: %f, %f", m_CurrentAZ, m_CurrentALT); 
         }
-        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated AZ/ALT: %f, %f", m_CurrentAZ, m_CurrentALT);
+        else if (m_IsMotionSlewing) {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated AZ/ALT skipped, motion slewing: %f, %f", m_CurrentAZ, m_CurrentALT); 
+        }
+        else {
+            // Update AZ/ALT
+            INDI::PropertyNumber numberProperty(property);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("AZ"))
+                    m_CurrentAZ = num.getValue();
+                else if (num.isNameMatch("ALT"))
+                    m_CurrentALT = num.getValue();
+            }
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated AZ/ALT: %f, %f", m_CurrentAZ, m_CurrentALT);
+        }
     }
     else if (property.isNameMatch("TELESCOPE_TRACK_STATE"))
     {
