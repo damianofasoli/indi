@@ -595,6 +595,12 @@ void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Res
     sendResponseValue(res, m_PierSide);
 }
 
+ void TelescopeBridge::handleDestinationSideOfPier(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    bool success = false;
+    sendResponseStatus(res, success, success ? "" : "DestinationSideOfPier is not yet implemented",1024);  // Not implemented exception
+ }
+
 void TelescopeBridge::handleSlewing(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);

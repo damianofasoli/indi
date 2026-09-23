@@ -158,6 +158,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleSetPark(req, res);
     else if (method == "sideofpier")
         handleSideOfPier(req, res);
+    else if (method == "destinationsideofpier")
+        handleDestinationSideOfPier(req, res);
     else if (method == "slewing")
         handleSlewing(req, res);
     else if (method == "supportedactions")
@@ -345,9 +347,9 @@ void TelescopeBridge::updateProperty(INDI::Property property)
         // Update pier side
         INDI::PropertySwitch switchProperty(property);
         if (switchProperty[0].getState() == ISS_ON)
-            m_PierSide = 0; // PIER_WEST in Alpaca
+            m_PierSide = 1; // PIER_WEST in Alpaca
         else if (switchProperty[1].getState() == ISS_ON)
-            m_PierSide = 1; // PIER_EAST in Alpaca
+            m_PierSide = 0; // PIER_EAST in Alpaca
         else
             m_PierSide = -1; // PIER_UNKNOWN in Alpaca
         DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated pier side: %d", m_PierSide);
