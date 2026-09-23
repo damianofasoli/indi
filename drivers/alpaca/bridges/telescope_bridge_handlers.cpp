@@ -202,6 +202,13 @@ void TelescopeBridge::handleDescription(const httplib::Request &req, httplib::Re
     sendResponseValue(res, description);
 }
 
+void TelescopeBridge::handleSupportedActions(const httplib::Request &req, httplib::Response &res)
+{
+    INDI_UNUSED(req);
+    json supportedActions = json::array(); // no custom supported actions for now
+    sendResponseValue(res, supportedActions);
+}
+
 void TelescopeBridge::handleDriverInfo(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
