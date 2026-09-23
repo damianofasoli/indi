@@ -107,6 +107,7 @@ class TelescopeBridge : public IDeviceBridge
         void handleSiteLongitude(const httplib::Request &req, httplib::Response &res);
         void handleSlewing(const httplib::Request &req, httplib::Response &res);
         void handleSlewSettleTime(const httplib::Request &req, httplib::Response &res);
+        void handleSupportedActions(const httplib::Request &req, httplib::Response &res);
         void handleTargetDeclination(const httplib::Request &req, httplib::Response &res);
         void handleTargetRightAscension(const httplib::Request &req, httplib::Response &res);
         void handleTracking(const httplib::Request &req, httplib::Response &res);

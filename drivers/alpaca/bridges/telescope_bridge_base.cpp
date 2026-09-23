@@ -160,6 +160,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleSideOfPier(req, res);
     else if (method == "slewing")
         handleSlewing(req, res);
+    else if (method == "supportedactions")
+        handleSupportedActions(req, res);
     else if (method == "tracking") {
         if (req.method=="PUT") 
             handleSetTracking(req, res);       
