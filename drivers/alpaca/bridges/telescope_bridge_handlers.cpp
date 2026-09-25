@@ -1905,6 +1905,11 @@ void TelescopeBridge::handleSetTracking(const httplib::Request &req, httplib::Re
         bool tracking = (formData["Tracking"] == "True" || formData["Tracking"] == "true" ||
                          formData["Tracking"] == "1");
 
+        if (tracking && m_IsParked) {
+            sendResponseStatus(res, false, "Cannot set tracking when telescope is parked",1032);  // ParkedException            
+            return;
+        }
+            
         auto trackState = m_Device.getSwitch("TELESCOPE_TRACK_STATE");
         if (trackState)
         {
