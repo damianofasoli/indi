@@ -55,7 +55,7 @@ class TelescopeBridge : public IDeviceBridge
         void updateProperty(INDI::Property property) override;
 
         // Common Alpaca API methods
-        void handleConnected(const httplib::Request &req, httplib::Response &res) override;
+        void handleConnected(const httplib::Request &req, httplib::Response &res) override; 
         void handleName(const httplib::Request &req, httplib::Response &res) override;
         void handleDescription(const httplib::Request &req, httplib::Response &res) override;
         void handleDriverInfo(const httplib::Request &req, httplib::Response &res) override;
@@ -66,6 +66,9 @@ class TelescopeBridge : public IDeviceBridge
         // clock helper methods
         double computeLST(double longitude_deg, std::chrono::system_clock::time_point tp);
         // Telescope-specific Alpaca API methods
+        void handleConnect(const httplib::Request &req, httplib::Response &res);   // V4 interface     
+        void handleConnecting(const httplib::Request &req, httplib::Response &res);  // V4 interface
+        void handleDisconnect(const httplib::Request &req, httplib::Response &res); // V4 interface
         void handleAlignmentMode(const httplib::Request &req, httplib::Response &res);
         void handleAltitude(const httplib::Request &req, httplib::Response &res);
         void handleApertureArea(const httplib::Request &req, httplib::Response &res);
@@ -173,6 +176,8 @@ class TelescopeBridge : public IDeviceBridge
         static constexpr double kAxisRateMin = 0.00418;
         static constexpr double kAxisRateMax = 3.344;
 
+        static constexpr int kInterfaceVersion = 4;
+
         // Current state tracking
         double m_CurrentRA {0}, m_CurrentDEC {0};
         double m_CurrentAZ {0}, m_CurrentALT {0};
@@ -189,6 +194,7 @@ class TelescopeBridge : public IDeviceBridge
         bool m_IsAtHome {true};
         double m_HomeDEC; // see constructor
         bool isConnectedAlpaca {false};
+        bool isConnectingAlpaca {false}; // ITelescope V4 connect and disconnect async 
 
         // Thread safety
         std::mutex m_Mutex;

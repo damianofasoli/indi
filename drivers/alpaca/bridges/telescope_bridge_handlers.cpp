@@ -94,6 +94,8 @@ double TelescopeBridge::computeLST(double longitude_deg,
 // Common Alpaca API methods
 void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Response &res)
 {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+
     bool isConnected = m_Device.isConnected();
     json response;
 
@@ -128,7 +130,7 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                     switchProperty[0].setState(ISS_ON);
                     // Request to send the switch to the device
                     requestNewSwitch(switchProperty);
-                    isConnectedAlpaca=true;
+                    isConnectedAlpaca=true; 
                     m_IsTargetRASet=false; // reset
                     m_IsTargetDecSet=false; // reset
                     sendResponseValue(res, true);
@@ -146,7 +148,7 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                 // SO LET'S BEHAVE ALPACA DISCONNECT IN A SIMILAR WAY TO NOT BREAK OTHER ALPACA OR INDI CLIENTS
                 //  
                 // Return value is false, because Alpaca requires it after Alpaca disconnection
-                isConnectedAlpaca=false;
+                isConnectedAlpaca=false; 
                 sendResponseValue(res,  false);
 
                 // // Disconnect the device
@@ -172,7 +174,7 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
                 if (isConnectedAlpaca) {
                     m_IsTargetRASet=false; // reset
                     m_IsTargetDecSet=false; // reset                    
-                }
+                }                 
                 sendResponseValue(res, connected);
             }
         }
@@ -186,6 +188,50 @@ void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Resp
         // GET request
         sendResponseValue(res, isConnectedAlpaca);
     }
+}
+
+void TelescopeBridge::handleConnect(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    if (!isConnectedAlpaca) {
+        // ITelescope V4 async connect
+        // Connect to INDI if it is not already connected
+        bool isConnected = m_Device.isConnected();
+        if (!isConnected) {
+            // Connect the device
+            auto connectSw = m_Device.getSwitch("CONNECTION");
+            if (connectSw)
+            {
+                INDI::PropertySwitch switchProperty(connectSw);
+                switchProperty.reset();
+                switchProperty[0].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+                // HERE NOT, ASYNC, isConnectedAlpaca=true;
+                m_IsTargetRASet=false; // reset
+                m_IsTargetDecSet=false; // reset
+            }            
+        }
+        isConnectingAlpaca=true; 
+    }
+    sendResponseValue(res,true); // no return value for Alpaca, true is a conventional value
+}
+
+void TelescopeBridge::handleConnecting(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::lock_guard<std::mutex> lock(m_Mutex);       
+    sendResponseValue(res, isConnectingAlpaca);
+}
+
+void TelescopeBridge::handleDisconnect(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    if (isConnectedAlpaca) {
+        // ITelescope V4 async disconnect
+        // Do not disconnect from INDI in any case
+        isConnectingAlpaca=true; 
+    }
+    sendResponseValue(res,true); // no return value for Alpaca, true is a conventional value
 }
 
 void TelescopeBridge::handleName(const httplib::Request &req, httplib::Response &res)
@@ -226,7 +272,7 @@ void TelescopeBridge::handleDriverVersion(const httplib::Request &req, httplib::
 void TelescopeBridge::handleInterfaceVersion(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res, 3);
+    sendResponseValue(res, kInterfaceVersion);
 }
 
 // Telescope-specific properties
