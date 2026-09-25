@@ -71,6 +71,12 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
     // Common methods
     if (method == "connected")
         handleConnected(req, res);
+    else if (method == "connect")
+        handleConnect(req, res);
+    else if (method == "connecting")
+        handleConnecting(req, res);
+    else if (method == "disconnect")
+        handleDisconnect(req, res);
     else if (method == "name")
         handleName(req, res);
     else if (method == "description")
@@ -238,6 +244,27 @@ void TelescopeBridge::updateProperty(INDI::Property property)
 
     const char *propName = property.getName();
     DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updating property: %s", propName);
+
+    // Update state for async connect (ITelescope V4)
+    if (isConnectingAlpaca) {
+        if (!isConnectedAlpaca) {
+            // ITelescope V4 async connect
+            // Just do it when INDI connection state is confirmed
+            auto connectSw = m_Device.getSwitch("CONNECTION");
+            if (connectSw)
+            {
+                INDI::PropertySwitch switchProperty(connectSw);
+                isConnectedAlpaca = switchProperty[0].getState() == ISS_ON;
+                if (isConnectedAlpaca) isConnectingAlpaca=false;
+            }        
+        }
+        else if (isConnectedAlpaca) {
+            // ITelescope V4 async disconnect
+            // Just do it regardless of INDI connection state
+            isConnectedAlpaca = false;
+            isConnectingAlpaca = false;
+        }     
+    }
 
     // Update telescope state based on property updates
     if (property.isNameMatch("EQUATORIAL_EOD_COORD"))
