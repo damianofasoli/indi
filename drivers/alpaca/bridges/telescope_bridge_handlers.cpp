@@ -791,6 +791,104 @@ void TelescopeBridge::handleTrackingRate(const httplib::Request &req, httplib::R
     }
 }
 
+void TelescopeBridge::handleGuideRateDeclination(const httplib::Request &req, httplib::Response &res) {
+    if (req.method == "PUT") {
+        std::map<std::string, std::string> formData;
+        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+        // Check if required parameters exist
+        if (formData.find("GuideRateDeclination") == formData.end())
+        {
+            sendResponseStatus(res, false, "Missing GuideRateDeclination parameter");
+            return;
+        }
+        else {
+            // Convert values to double
+            double rate = std::stod(formData["GuideRateDeclination"]);
+            auto guideRateNmb = m_Device.getNumber("GUIDE_RATE");
+            if (guideRateNmb) {
+                // Set rate
+                INDI::PropertyNumber numberProperty(guideRateNmb);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("GUIDE_RATE_NS"))
+                        num.setValue(rate);
+                }
+                // Request to send rate to the device
+                requestNewNumber(numberProperty);
+                sendResponseValue(res, true);
+                return;
+            }
+        }            
+        sendResponseStatus(res,false,"Cannot set declination guide rate");            
+    }
+    else {
+        double guideRate;
+        auto guideRateNmb = m_Device.getNumber("GUIDE_RATE");
+        if (guideRateNmb)
+        {
+            for (auto &num : guideRateNmb)
+            {
+                if (num.isNameMatch("GUIDE_RATE_NS")) {
+                    guideRate = num.getValue();
+                    sendResponseValue(res, guideRate);
+                    return;
+                }
+            } 
+        }
+        sendResponseStatus(res,false,"Cannot get declination guide rate");           
+    }
+}
+
+void TelescopeBridge::handleGuideRateRightAscension(const httplib::Request &req, httplib::Response &res) {
+    if (req.method == "PUT") {
+        std::map<std::string, std::string> formData;
+        DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+        // Check if required parameters exist
+        if (formData.find("GuideRateRightAscension") == formData.end())
+        {
+            sendResponseStatus(res, false, "Missing GuideRateRightAscension parameter");
+            return;
+        }
+        else {
+            // Convert values to double
+            double rate = std::stod(formData["GuideRateRightAscension"]);
+            auto guideRateNmb = m_Device.getNumber("GUIDE_RATE");
+            if (guideRateNmb) {
+                // Set rate
+                INDI::PropertyNumber numberProperty(guideRateNmb);
+                for (auto &num : numberProperty)
+                {
+                    if (num.isNameMatch("GUIDE_RATE_WE"))
+                        num.setValue(rate);
+                }
+                // Request to send rate to the device
+                requestNewNumber(numberProperty);
+                sendResponseValue(res, true);
+                return;
+            }
+        }            
+        sendResponseStatus(res,false,"Cannot set right ascension guide rate");            
+    }
+    else {
+        double guideRate;
+        auto guideRateNmb = m_Device.getNumber("GUIDE_RATE");
+        if (guideRateNmb)
+        {
+            for (auto &num : guideRateNmb)
+            {
+                if (num.isNameMatch("GUIDE_RATE_WE")) {
+                    guideRate = num.getValue();
+                    sendResponseValue(res, guideRate);
+                    return;
+                }
+            } 
+        }
+        sendResponseStatus(res,false,"Cannot get right ascension guide rate");           
+    }
+}
+
 
 void TelescopeBridge::handleAtPark(const httplib::Request &req, httplib::Response &res)
 {
