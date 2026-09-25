@@ -181,7 +181,11 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
     else if (method == "trackingrates") 
         handleTrackingRates(req, res);   
     else if (method == "trackingrate") 
-        handleTrackingRate(req, res);           
+        handleTrackingRate(req, res);   
+    else if (method == "guideratedeclination") 
+        handleGuideRateDeclination(req, res);   
+    else if (method == "guideraterightascension") 
+        handleGuideRateRightAscension(req, res);   
     else if (method == "atpark")
         handleAtPark(req, res);
     else if (method == "athome")
