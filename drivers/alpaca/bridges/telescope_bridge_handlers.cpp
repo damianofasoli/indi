@@ -718,21 +718,29 @@ void TelescopeBridge::handleTrackingRate(const httplib::Request &req, httplib::R
                     if (tracking_rate == 0 && wvs.isNameMatch("TRACK_SIDEREAL")) {
                         j=i; 
                         rate_supported=true;
+                        // m_DeclinationRateAlpaca can have no zero values
+                        // m_RightAscensionRateAlpaca can have no zero values
                         break;
                     }
                     if (tracking_rate == 1 && wvs.isNameMatch("TRACK_LUNAR")) {
                         j=i; 
                         rate_supported=true;
+                        m_DeclinationRateAlpaca=0.0;
+                        m_RightAscensionRateAlpaca=0.0;
                         break;
                     }
                     if (tracking_rate == 2 && wvs.isNameMatch("TRACK_SOLAR")) {
                         j=i; 
                         rate_supported=true;
+                        m_DeclinationRateAlpaca=0.0;
+                        m_RightAscensionRateAlpaca=0.0;
                         break;
                     }
                     if (tracking_rate == 3 && wvs.isNameMatch("TRACK_KING")) {
                         j=i; 
                         rate_supported=true;
+                        m_DeclinationRateAlpaca=0.0;
+                        m_RightAscensionRateAlpaca=0.0;
                         break;
                     }                                        
                 }
@@ -1978,9 +1986,35 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
         // Convert RightAscensionRate value to double
         double raRate = std::stod(formData["RightAscensionRate"]);
 
-        // Set Tracking mode to CUSTOM   
+        // Set Tracking mode to CUSTOM, if it SIDEREAL, do not set it if it is already CUSTOM, throw exception otherwise (lunar and solar tracking)   
         auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
         if (trackModeSw) {
+
+            bool doSetCustomTrack = false;
+            bool throwException = true;
+            int j0=-1;
+            for (auto &wvs0 :trackModeSw) {
+                j0++;
+                INDI::PropertySwitch switchProperty(trackModeSw);
+                if (wvs0.isNameMatch("TRACK_SIDEREAL")) {
+                    if (switchProperty[j0].getState()==ISS_ON) {
+                        doSetCustomTrack=true;
+                        throwException=false;
+                        break;
+                    }
+                }
+                else if (wvs0.isNameMatch("TRACK_CUSTOM")) {
+                    if (switchProperty[j0].getState()==ISS_ON) {
+                        throwException=false;
+                        break;
+                    }
+                } 
+            }
+            if (throwException) {
+                sendResponseStatus(res, false, "Right ascension rate can be set only in sidereal tracking mode",1035);  // InvalidOperationException
+                return;
+            }            
+
             int j=-1;
             for (auto &wvs :trackModeSw) {
                 j++;
@@ -2001,10 +2035,12 @@ void TelescopeBridge::handleSetRightAscensionRate(const httplib::Request &req, h
                     //     }
                     // }
 
-                    INDI::PropertySwitch switchProperty(trackModeSw);
-                    switchProperty.reset();
-                    switchProperty[j].setState(ISS_ON);
-                    requestNewSwitch(switchProperty);
+                    if (doSetCustomTrack) {
+                        INDI::PropertySwitch switchProperty(trackModeSw);
+                        switchProperty.reset();
+                        switchProperty[j].setState(ISS_ON);
+                        requestNewSwitch(switchProperty);
+                    }
 
                     double raRate1 = 15.041067 - 15.0 * raRate; 
                     auto trackRate = m_Device.getNumber("TELESCOPE_TRACK_RATE");
@@ -2068,18 +2104,46 @@ void TelescopeBridge::handleSetDeclinationRate(const httplib::Request &req, http
         // Convert DeclinationRate value to double
         double decRate = std::stod(formData["DeclinationRate"]);
 
-        // Set Tracking mode to CUSTOM
+        // Set Tracking mode to CUSTOM, if it SIDEREAL, do not set it if it is already CUSTOM, throw exception otherwise (lunar and solar tracking)
         auto trackModeSw = m_Device.getSwitch("TELESCOPE_TRACK_MODE");
         if (trackModeSw) {
+
+            bool doSetCustomTrack = false;
+            bool throwException = true;
+            int j0=-1;
+            for (auto &wvs0 :trackModeSw) {
+                j0++;
+                INDI::PropertySwitch switchProperty(trackModeSw);
+                if (wvs0.isNameMatch("TRACK_SIDEREAL")) {
+                    if (switchProperty[j0].getState()==ISS_ON) {
+                        doSetCustomTrack=true;
+                        throwException=false;
+                        break;
+                    }
+                }
+                else if (wvs0.isNameMatch("TRACK_CUSTOM")) {
+                    if (switchProperty[j0].getState()==ISS_ON) {
+                        throwException=false;
+                        break;
+                    }
+                } 
+            }
+            if (throwException) {
+                sendResponseStatus(res, false, "Declination rate can be set only in sidereal tracking mode",1035);  // InvalidOperationException
+                return;
+            }
+
             int j=-1;
             for (auto &wvs :trackModeSw) {
                 j++;
                 if (wvs.isNameMatch("TRACK_CUSTOM")) {
                   
-                    INDI::PropertySwitch switchProperty(trackModeSw);
-                    switchProperty.reset();
-                    switchProperty[j].setState(ISS_ON);
-                    requestNewSwitch(switchProperty);
+                    if (doSetCustomTrack) {
+                        INDI::PropertySwitch switchProperty(trackModeSw);
+                        switchProperty.reset();
+                        switchProperty[j].setState(ISS_ON);
+                        requestNewSwitch(switchProperty);
+                    }
 
                     // detect PIER side and also change sign when PIER side is WEST
                     double sign=1.0; 
