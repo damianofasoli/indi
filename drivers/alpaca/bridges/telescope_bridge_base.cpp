@@ -168,6 +168,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleDestinationSideOfPier(req, res);
     else if (method == "slewing")
         handleSlewing(req, res);
+    else if (method == "ispulseguiding")
+        handleIsPulseGuiding(req, res);
     else if (method == "supportedactions")
         handleSupportedActions(req, res);
     else if (method == "tracking") {
@@ -372,6 +374,31 @@ void TelescopeBridge::updateProperty(INDI::Property property)
         }
         DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated motion slewing state: %s",
                      m_IsMotionSlewing ? "MOTION SLEWING" : "NOT MOTION SLEWING");
+    }
+    else if (property.isNameMatch("TELESCOPE_TIMED_GUIDE_NS") || property.isNameMatch("TELESCOPE_TIMED_GUIDE_WE")) {
+        INDI::PropertyNumber numberProperty(property);
+        // Check if the other axis is still pulsing
+        bool pulsing=false;
+        if (property.isNameMatch("TELESCOPE_TIMED_GUIDE_NS"))
+        {
+            auto weTg = m_Device.getProperty("TELESCOPE_TIMED_GUIDE_WE");
+            if (weTg)
+            {
+                pulsing = (weTg.getState() == IPS_BUSY);
+            }
+        }
+        else
+        {
+            auto nsTg = m_Device.getProperty("TELESCOPE_TIMED_GUIDE_WE");
+            if (nsTg)
+            {
+                pulsing = (nsTg.getState() == IPS_BUSY);
+            }
+        }
+        if (!pulsing) {
+            pulsing = (property.getState() == IPS_BUSY);
+        }
+        m_IsPulseGuiding=pulsing;    
     }
     else if (property.isNameMatch("TELESCOPE_PIER_SIDE"))
     {
