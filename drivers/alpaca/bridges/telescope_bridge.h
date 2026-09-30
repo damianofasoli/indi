@@ -189,7 +189,8 @@ class TelescopeBridge : public IDeviceBridge
         bool m_IsParked {false};
         bool m_IsEqCoordsSlewing {false};
         bool m_IsHoCoordsSlewing {false};
-        bool m_IsMotionSlewing {false};        
+        bool m_IsMotionSlewing {false};   
+        bool m_IsPulseGuiding {false};    
         int m_PierSide {0};
         bool m_IsAtHome {true};
         double m_HomeDEC; // see constructor

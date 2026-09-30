@@ -911,6 +911,12 @@ void TelescopeBridge::handleAtHome(const httplib::Request &req, httplib::Respons
     sendResponseValue(res, m_IsAtHome);    
 }
 
+void TelescopeBridge::handleIsPulseGuiding(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    sendResponseValue(res, m_IsPulseGuiding);    
+}
+
 // Telescope-specific actions
 void TelescopeBridge::handleAbortSlew(const httplib::Request &req, httplib::Response &res)
 {
@@ -1560,10 +1566,17 @@ void TelescopeBridge::handleSlewToAltAzAsync(const httplib::Request &req, httpli
 
 void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Response &res)
 {
+    std::lock_guard<std::mutex> lock(m_Mutex);
     if (m_IsParked) {
         sendResponseStatus(res,false,"Pulse guide failed because telescope is parked",1032); // ParkException
     }    
-    else {
+    else if(!m_IsTracking) {
+        sendResponseStatus(res,false,"Pulse guide failed because telescope is not tracking",1035); // InvalidOperationException
+    }
+    else if(m_IsMotionSlewing || m_IsEqCoordsSlewing || m_IsHoCoordsSlewing) {
+        sendResponseStatus(res,false,"Pulse guide failed because telescope is slewing",1035); // InvalidOperationException
+    }
+    else {        
         bool success = false;
         try
         {
@@ -1592,6 +1605,7 @@ void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Res
                     numberProperty[direction].setValue(duration);
                     // Request to send the guide command to the device
                     requestNewNumber(numberProperty);
+                    m_IsPulseGuiding=true;
                     success = true;
                 }
             }
@@ -1604,6 +1618,7 @@ void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Res
                     numberProperty[direction - 2].setValue(duration);
                     // Request to send the guide command to the device
                     requestNewNumber(numberProperty);
+                    m_IsPulseGuiding=true;
                     success = true;
                 }
             }
