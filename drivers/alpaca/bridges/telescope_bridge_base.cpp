@@ -164,6 +164,8 @@ void TelescopeBridge::handleRequest(const std::string &method, const httplib::Re
         handleSetPark(req, res);
     else if (method == "sideofpier")
         handleSideOfPier(req, res);
+    else if (method == "devicestate")
+        handleDeviceState(req, res);
     else if (method == "destinationsideofpier")
         handleDestinationSideOfPier(req, res);
     else if (method == "slewing")

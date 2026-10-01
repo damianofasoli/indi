@@ -91,6 +91,41 @@ double TelescopeBridge::computeLST(double longitude_deg,
     return LST;
 }
 
+double TelescopeBridge::getLST()  {
+    // Sidereal time is taken from Number if available, otherwise it is computed
+    bool computeFlag = true;
+    double lst_alpaca;
+    auto lstNumber = m_Device.getNumber("TIME_LST");
+    if (lstNumber.isValid()) {
+        for(auto &wvn: lstNumber) {
+            if (wvn.isNameMatch("LST")) {
+                lst_alpaca = wvn.getValue(); 
+                computeFlag=false;
+                break;
+            }
+        }                
+    } 
+    if (computeFlag) {
+        auto geoCoord = m_Device.getNumber("GEOGRAPHIC_COORD");
+        if (!geoCoord.isValid())
+        {
+            throw std::runtime_error("GEOGRAPHIC_COORD property not found");
+        }        
+        double longitudeDeg = 0.0;
+        INDI::PropertyNumber numberProperty(geoCoord);
+        for (auto &num : numberProperty)
+        {
+            if (num.isNameMatch("LONG"))
+            {
+                longitudeDeg = num.getValue();
+                break;
+            }
+        }     
+        lst_alpaca = computeLST(longitudeDeg);        
+    }  
+    return lst_alpaca;  
+}
+
 // Common Alpaca API methods
 void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Response &res)
 {
@@ -647,6 +682,83 @@ void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Res
     sendResponseStatus(res, success, success ? "" : "DestinationSideOfPier is not yet implemented",1024);  // Not implemented exception
  }
 
+void TelescopeBridge::handleDeviceState(const httplib::Request &req, httplib::Response &res) {    
+    INDI_UNUSED(req);
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    // Create a JSON array of StateValue objects
+    json stateValArray = json::array();
+
+    stateValArray.push_back(
+    {
+        {"Name", "Altitude"}, 
+        {"Value", m_CurrentALT}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "AtHome"}, 
+        {"Value", m_IsAtHome}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "AtPark"}, 
+        {"Value", m_IsParked}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "Azimuth"}, 
+        {"Value", m_CurrentAZ}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "Declination"}, 
+        {"Value", m_CurrentDEC}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "IsPulseGuiding"}, 
+        {"Value", m_IsPulseGuiding}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "RightAscension"}, 
+        {"Value", m_CurrentRA}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "SideOfPier"}, 
+        {"Value", m_PierSide}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "SiderealTime"}, 
+        {"Value", getLST()}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "Slewing"}, 
+        {"Value", m_IsMotionSlewing || m_IsEqCoordsSlewing || m_IsHoCoordsSlewing}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "Tracking"}, 
+        {"Value", m_IsTracking}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "UTCDate"}, 
+        {"Value", getUTCDate()}
+    });
+    stateValArray.push_back(
+    {
+        {"Name", "TimeStamp"}, 
+        {"Value", getTimeStamp()}
+    });
+
+    // Send the response
+    sendResponseValue(res, stateValArray);    
+}
+
+
 void TelescopeBridge::handleSlewing(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
@@ -1045,8 +1157,7 @@ void TelescopeBridge::handleSetPark(const httplib::Request &req, httplib::Respon
     sendResponseStatus(res, success, success ? "" : "Failed to set park position for telescope");      
 }
 
-void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Response &res) {
-    INDI_UNUSED(req);
+std::string TelescopeBridge::getUTCDate() {
     std::string utc_alpaca="1970-01-01T00:00:00Z"; //fallback
     auto utcTxt = m_Device.getText("TIME_UTC");
     if (utcTxt) {
@@ -1062,45 +1173,50 @@ void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Respon
             }
         }
     }
-    // return value
+    return utc_alpaca;
+}
+
+std::string TelescopeBridge::getTimeStamp() {
+    auto now = std::chrono::system_clock::now();
+
+    // Seconds component
+    auto now_sec = std::chrono::time_point_cast<std::chrono::seconds>(now);
+    std::time_t time_t_now = std::chrono::system_clock::to_time_t(now_sec);
+
+    // Remaining milliseconds (0..999)
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - now_sec);
+
+    std::tm gm_tm;
+#if defined(_WIN32)
+    gmtime_s(&gm_tm, &time_t_now);
+#else
+    gmtime_r(&time_t_now, &gm_tm);
+#endif
+
+    std::ostringstream ss;
+    ss << std::put_time(&gm_tm, "%Y-%m-%dT%H:%M:%S")
+       << '.' 
+       << std::setfill('0') << std::setw(3) << ms.count() 
+       << 'Z';
+
+    return ss.str();    
+}
+
+void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Response &res) {
+    INDI_UNUSED(req);
+    std::string utc_alpaca = getUTCDate();
     sendResponseValue(res,utc_alpaca);
 }
 
 void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::Response &res) {
     INDI_UNUSED(req);
-    // Sidereal time is taken from Number if available, otherwise it is computed
-    bool computeFlag = true;
-    double lst_alpaca;
-    auto lstNumber = m_Device.getNumber("TIME_LST");
-    if (lstNumber.isValid()) {
-        for(auto &wvn: lstNumber) {
-            if (wvn.isNameMatch("LST")) {
-                lst_alpaca = wvn.getValue(); 
-                computeFlag=false;
-                break;
-            }
-        }                
-    } 
-    if (computeFlag) {
-        auto geoCoord = m_Device.getNumber("GEOGRAPHIC_COORD");
-        if (!geoCoord.isValid())
-        {
-            sendResponseValue(res, 0.0, false, "GEOGRAPHIC_COORD property not found");
-            return;
-        }        
-        double longitudeDeg = 0.0;
-        INDI::PropertyNumber numberProperty(geoCoord);
-        for (auto &num : numberProperty)
-        {
-            if (num.isNameMatch("LONG"))
-            {
-                longitudeDeg = num.getValue();
-                break;
-            }
-        }     
-        lst_alpaca = computeLST(longitudeDeg);        
+    try {
+        double lst_alpaca=getLST();
+        sendResponseValue(res,lst_alpaca); 
     }
-    sendResponseValue(res,lst_alpaca); 
+    catch (const std::runtime_error& e) {
+        sendResponseValue(res, 0.0, false, std::string(e.what()));
+    }
 }
 
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res) {
