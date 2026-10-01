@@ -64,7 +64,10 @@ class TelescopeBridge : public IDeviceBridge
 
     private:
         // clock helper methods
+        std::string getTimeStamp();
+        std::string getUTCDate();
         double computeLST(double longitude_deg, std::chrono::system_clock::time_point tp);
+        double getLST();
         // Telescope-specific Alpaca API methods
         void handleConnect(const httplib::Request &req, httplib::Response &res);   // V4 interface     
         void handleConnecting(const httplib::Request &req, httplib::Response &res);  // V4 interface
@@ -95,6 +98,7 @@ class TelescopeBridge : public IDeviceBridge
         void handleDeclination(const httplib::Request &req, httplib::Response &res);     
         void handleDeclinationRate(const httplib::Request &req, httplib::Response &res);
         void handleDestinationSideOfPier(const httplib::Request &req, httplib::Response &res);
+        void handleDeviceState(const httplib::Request &req, httplib::Response &res);
         void handleDoesRefraction(const httplib::Request &req, httplib::Response &res);
         void handleEquatorialSystem(const httplib::Request &req, httplib::Response &res);
         void handleFocalLength(const httplib::Request &req, httplib::Response &res);
