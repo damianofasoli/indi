@@ -728,11 +728,15 @@ void TelescopeBridge::handleDeviceState(const httplib::Request &req, httplib::Re
         {"Name", "SideOfPier"}, 
         {"Value", m_PierSide}
     });
-    stateValArray.push_back(
-    {
-        {"Name", "SiderealTime"}, 
-        {"Value", getLST()}
-    });
+   try {
+        //getLST() can raise exception
+        stateValArray.push_back(
+        {
+            {"Name", "SiderealTime"}, 
+            {"Value", getLST()}
+        });
+    }
+    catch (const std::runtime_error& e) {}   
     stateValArray.push_back(
     {
         {"Name", "Slewing"}, 
