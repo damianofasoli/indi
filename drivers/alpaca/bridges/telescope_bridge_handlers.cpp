@@ -677,9 +677,53 @@ void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Res
 }
 
  void TelescopeBridge::handleDestinationSideOfPier(const httplib::Request &req, httplib::Response &res) {
-    INDI_UNUSED(req);
     bool success = false;
-    sendResponseStatus(res, success, success ? "" : "DestinationSideOfPier is not yet implemented",1024);  // Not implemented exception
+    try
+    {
+        // Check if required parameters exist
+        if (!req.has_param("RightAscension") || !req.has_param("Declination"))
+        {
+            sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
+            return;
+        }
+
+        // Convert values to double
+        double ra = std::stod(req.get_param_value("RightAscension"));        
+        double dec = std::stod(req.get_param_value("Declination")); 
+        INDI_UNUSED(dec);
+
+        double lst;
+        try {
+            lst=getLST();
+        }
+        catch (const std::runtime_error& e) {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Cannot get sidereal time now: %s", e.what());
+            sendResponseValue(res, -1); // Pier unknown
+            return;
+        }   
+        
+        double ha = lst - ra;
+        if (ha<=-12.0) ha+=12.0;
+        else if (ha>=12.0) ha-=12.0;
+
+        if (ha<0.0) {
+            sendResponseValue(res, 1); // Pier west
+        }
+        else if (ha>0.0) {
+            sendResponseValue(res, 0); // Pier east
+        }
+        else {
+            sendResponseValue(res, -1); // Pier unknown
+        }
+        return;
+
+    }
+    catch (const std::exception &e)
+    {
+        DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SetTracking request: %s", e.what());
+    }
+
+    sendResponseStatus(res, success, success ? "" : "Failed to handle DestinationSideOfPier");
  }
 
 void TelescopeBridge::handleDeviceState(const httplib::Request &req, httplib::Response &res) {    
