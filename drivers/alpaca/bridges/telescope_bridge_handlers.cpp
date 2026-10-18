@@ -671,9 +671,74 @@ void TelescopeBridge::handleRightAscensionRate(const httplib::Request &req, http
 
 void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Response &res)
 {
-    INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_PierSide);
+ 
+    if (req.method=="PUT") {
+        try {
+            bool success = false;
+
+            // Parse form-urlencoded data from request body
+            std::map<std::string, std::string> formData;
+            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+            // Check if required parameters exist
+            if (formData.find("SideOfPier") == formData.end())
+            {
+                sendResponseStatus(res, false, "Missing SideOfPier parameter");
+                return;
+            }
+
+            int pierSide = std::stoi(formData["SideOfPier"]);
+            int pierTargetSideIndi=0; // Target pier auto Indi
+            if (pierSide==0) {
+                // PIER_EAST in Alpaca
+                pierTargetSideIndi=2; // Target pier east Indi, pointing west                    
+            }
+            else if (pierSide==1) {
+                // PIER_WEST in Alpaca
+                pierTargetSideIndi=1; // Target pier west Indi, pointing east                    
+            }
+
+            // Update target pier side
+            auto targetPierSw = m_Device.getSwitch("TARGETPIERSIDE");
+            if (targetPierSw)
+            {
+                INDI::PropertySwitch switchProperty(targetPierSw);
+                switchProperty.reset();
+                switchProperty[pierTargetSideIndi].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+                success = true;
+            }
+            
+            std::string msg="";
+            if (success) {
+                if (targetPierSw && pierTargetSideIndi!=0) {
+                    success = SlewToTargetAsync(msg);
+                    // Reset TargetPierSide to Auto
+                    if (targetPierSw[0].getState()!=ISS_ON) {
+                        INDI::PropertySwitch switchProperty(targetPierSw);
+                        switchProperty.reset();
+                        switchProperty[0].setState(ISS_ON);
+                        // Request to send the switch to the device
+                        requestNewSwitch(switchProperty);
+                    }
+                }
+            }
+            else {
+                msg="Failed to set side of pier";
+            }
+
+            sendResponseStatus(res, success, msg);
+        }
+        catch (const std::exception &e)
+        {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SetSideOfPier request: %s", e.what());
+        }
+    }
+    else {
+        sendResponseValue(res, m_PierSide);
+    }
 }
 
  void TelescopeBridge::handleDestinationSideOfPier(const httplib::Request &req, httplib::Response &res) {
@@ -1353,6 +1418,7 @@ void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, 
                     // Request to send the coordinates to the device
                     requestNewNumber(numberProperty);
                     m_IsEqCoordsSlewing=true;
+
                     success = true;
 
 
@@ -1380,64 +1446,77 @@ void TelescopeBridge::handleSlewToTargetAsync(const httplib::Request &req, httpl
     else {
 
         INDI_UNUSED(req);
-        int successlevel=0;
-        double ra=0.0, dec=0.0;
 
-        auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
-        if (eqTargetCoord)
+        std::string msg="";
+        bool success = SlewToTargetAsync(msg);
+        sendResponseStatus(res, success, msg);
+    }
+}
+
+bool TelescopeBridge::SlewToTargetAsync(std::string &msg)
+{
+    int successlevel = 0;
+    double ra = 0.0, dec = 0.0;
+
+    auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+    if (eqTargetCoord)
+    {
+        INDI::PropertyNumber numberProperty(eqTargetCoord);
+        for (auto &num : numberProperty)
         {
-            INDI::PropertyNumber numberProperty(eqTargetCoord);
-            for (auto &num : numberProperty)
+            if (num.isNameMatch("RA"))
             {
-                if (num.isNameMatch("RA")) {
-                    ra = num.getValue();
-                    successlevel++;
-                }
-                else if (num.isNameMatch("DEC")) {
-                    dec = num.getValue();
-                    successlevel++;
-                }
-            }            
-        }   
-        
-        if (successlevel==2) {
-
-            bool success = false;
-            auto coordSet = m_Device.getSwitch("ON_COORD_SET");
-            auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
-            if (coordSet && eqCoord)
-            {
-
-                // Set to TRACK mode
-                INDI::PropertySwitch switchProperty(coordSet);
-                switchProperty.reset();
-                switchProperty[0].setState(ISS_ON);
-                // Request to send the switch to the device
-                requestNewSwitch(switchProperty);
-
-                // Set coordinates                
-                INDI::PropertyNumber numberProperty(eqCoord);
-                for (auto &num : numberProperty)
-                {
-                    if (num.isNameMatch("RA"))
-                        num.setValue(ra);
-                    else if (num.isNameMatch("DEC"))
-                        num.setValue(dec);
-                }
-                // Request to send the coordinates to the device
-                requestNewNumber(numberProperty);
-                m_IsEqCoordsSlewing=true;
-                success = true;
-
+                ra = num.getValue();
+                successlevel++;
             }
-            sendResponseStatus(res, success, success ? "" : "Failed to slew to target"); 
-        }   
-        else {
-            sendResponseStatus(res, false, "Failed to get target right ascension or target declination");
-        }  
-
+            else if (num.isNameMatch("DEC"))
+            {
+                dec = num.getValue();
+                successlevel++;
+            }
+        }
     }
 
+    if (successlevel == 2)
+    {
+
+        bool success = false;
+        auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+        auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+        if (coordSet && eqCoord)
+        {
+
+            // Set to TRACK mode
+            INDI::PropertySwitch switchProperty(coordSet);
+            switchProperty.reset();
+            switchProperty[0].setState(ISS_ON);
+            // Request to send the switch to the device
+            requestNewSwitch(switchProperty);
+
+            // Set coordinates
+            INDI::PropertyNumber numberProperty(eqCoord);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("RA"))
+                    num.setValue(ra);
+                else if (num.isNameMatch("DEC"))
+                    num.setValue(dec);
+            }
+            // Request to send the coordinates to the device
+            requestNewNumber(numberProperty);
+            m_IsEqCoordsSlewing = true;
+
+            success = true;
+        }
+        if (!success) msg="Failed to slew to target";
+        return success;
+    }
+    else
+    {
+        msg = "Failed to get target right ascension or target declination";
+        return false;
+    }
+    return false;
 }
 
 void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httplib::Response &res)

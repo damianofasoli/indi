@@ -142,6 +142,7 @@ class TelescopeBridge : public IDeviceBridge
         void handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res);
         void handleSlewToTarget(const httplib::Request &req, httplib::Response &res);
         void handleSlewToTargetAsync(const httplib::Request &req, httplib::Response &res);
+        bool SlewToTargetAsync(std::string &msg);
         void handleSyncToAltAz(const httplib::Request &req, httplib::Response &res);
         void handleSyncToCoordinates(const httplib::Request &req, httplib::Response &res);
         //void SyncWait(bool &success, INDI::PropertyNumber &eqCoord, std::string &failMessage);
