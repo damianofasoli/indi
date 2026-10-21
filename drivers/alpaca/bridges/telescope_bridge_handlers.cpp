@@ -677,59 +677,64 @@ void TelescopeBridge::handleSideOfPier(const httplib::Request &req, httplib::Res
         try {
             bool success = false;
 
-            // Parse form-urlencoded data from request body
-            std::map<std::string, std::string> formData;
-            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+            if (m_Device.getProperty("TARGETPIERSIDE").isValid()) {
+                // Parse form-urlencoded data from request body
+                std::map<std::string, std::string> formData;
+                DeviceManager::parseFormUrlEncodedBody(req.body, formData);
 
-            // Check if required parameters exist
-            if (formData.find("SideOfPier") == formData.end())
-            {
-                sendResponseStatus(res, false, "Missing SideOfPier parameter");
-                return;
-            }
+                // Check if required parameters exist
+                if (formData.find("SideOfPier") == formData.end())
+                {
+                    sendResponseStatus(res, false, "Missing SideOfPier parameter");
+                    return;
+                }
 
-            int pierSide = std::stoi(formData["SideOfPier"]);
-            int pierTargetSideIndi=0; // Target pier auto Indi
-            if (pierSide==0) {
-                // PIER_EAST in Alpaca
-                pierTargetSideIndi=2; // Target pier east Indi, pointing west                    
-            }
-            else if (pierSide==1) {
-                // PIER_WEST in Alpaca
-                pierTargetSideIndi=1; // Target pier west Indi, pointing east                    
-            }
-
-            // Update target pier side
-            auto targetPierSw = m_Device.getSwitch("TARGETPIERSIDE");
-            if (targetPierSw)
-            {
-                INDI::PropertySwitch switchProperty(targetPierSw);
-                switchProperty.reset();
-                switchProperty[pierTargetSideIndi].setState(ISS_ON);
-                // Request to send the switch to the device
-                requestNewSwitch(switchProperty);
-                success = true;
-            }
-            
-            std::string msg="";
-            if (success) {
-                if (targetPierSw && pierTargetSideIndi!=0) {
-                    success = SlewToTargetAsync(msg);
-                    // Reset TargetPierSide to Auto
-                    if (targetPierSw[0].getState()!=ISS_ON) {
-                        INDI::PropertySwitch switchProperty(targetPierSw);
-                        switchProperty.reset();
-                        switchProperty[0].setState(ISS_ON);
-                        // Request to send the switch to the device
-                        requestNewSwitch(switchProperty);
+                int pierSide = std::stoi(formData["SideOfPier"]);
+                int pierTargetSideIndi=0; // Target pier auto Indi
+                if (pierSide==0) {
+                    // PIER_EAST in Alpaca
+                    pierTargetSideIndi=2; // Target pier east Indi, pointing west                    
+                }
+                else if (pierSide==1) {
+                    // PIER_WEST in Alpaca
+                    pierTargetSideIndi=1; // Target pier west Indi, pointing east                    
+                }
+                            // Update target pier side
+                auto targetPierSw = m_Device.getSwitch("TARGETPIERSIDE");
+                if (targetPierSw)
+                {
+                    INDI::PropertySwitch switchProperty(targetPierSw);
+                    switchProperty.reset();
+                    switchProperty[pierTargetSideIndi].setState(ISS_ON);
+                    // Request to send the switch to the device
+                    requestNewSwitch(switchProperty);
+                    success = true;
+                }
+                
+                std::string msg="";
+                if (success) {
+                    if (targetPierSw && pierTargetSideIndi!=0) {
+                        success = SlewToTargetAsync(msg);
+                        // Reset TargetPierSide to Auto
+                        if (targetPierSw[0].getState()!=ISS_ON) {
+                            INDI::PropertySwitch switchProperty(targetPierSw);
+                            switchProperty.reset();
+                            switchProperty[0].setState(ISS_ON);
+                            // Request to send the switch to the device
+                            requestNewSwitch(switchProperty);
+                        }
                     }
                 }
+                else {
+                    msg="Failed to set side of pier";
+                }
+
+                sendResponseStatus(res, success, msg);
             }
             else {
-                msg="Failed to set side of pier";
+                sendResponseStatus(res, false, "Cannot set pier side",1024); //PropertyNotImplemented exception
             }
 
-            sendResponseStatus(res, success, msg);
         }
         catch (const std::exception &e)
         {
