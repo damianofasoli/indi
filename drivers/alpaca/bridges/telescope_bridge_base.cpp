@@ -297,8 +297,7 @@ void TelescopeBridge::updateProperty(INDI::Property property)
                     if (std::isnan(m_HomeDEC)) m_HomeDEC=m_CurrentDEC;                
                 }
             }
-            m_IsAtHome = (m_CurrentDEC==m_HomeDEC);
-            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC); 
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC);             
         }
     }
     else if (property.isNameMatch("HORIZONTAL_COORD"))

@@ -68,6 +68,7 @@ class TelescopeBridge : public IDeviceBridge
         std::string getUTCDate();
         double computeLST(double longitude_deg, std::chrono::system_clock::time_point tp);
         double getLST();
+        bool isAtHome();
         // Telescope-specific Alpaca API methods
         void handleConnect(const httplib::Request &req, httplib::Response &res);   // V4 interface     
         void handleConnecting(const httplib::Request &req, httplib::Response &res);  // V4 interface
@@ -197,7 +198,6 @@ class TelescopeBridge : public IDeviceBridge
         bool m_IsMotionSlewing {false};   
         bool m_IsPulseGuiding {false};    
         int m_PierSide {0};
-        bool m_IsAtHome {true};
         double m_HomeDEC; // see constructor
         bool isConnectedAlpaca {false};
         bool isConnectingAlpaca {false}; // ITelescope V4 connect and disconnect async 
