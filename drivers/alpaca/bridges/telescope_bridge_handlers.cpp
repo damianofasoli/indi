@@ -126,6 +126,28 @@ double TelescopeBridge::getLST()  {
     return lst_alpaca;  
 }
 
+bool TelescopeBridge::isAtHome() {
+    bool result;
+    INDI::Property eqCoord = m_Device.getProperty("EQUATORIAL_EOD_COORD");
+    INDI::Property hoCoord = m_Device.getProperty("HORIZONTAL_COORD");
+    if (eqCoord && hoCoord) {
+        double eps = 0.005;  // 18 arcseconds
+        bool checkAZ = std::abs(std::fmod(m_CurrentAZ, 360.0)) < eps;
+        bool checkDEC = std::abs(std::fmod(std::abs(m_CurrentDEC), 90.0)) - 90.0 < eps; 
+        result = checkAZ && checkDEC;
+    }
+    else if (eqCoord) {
+        if (std::isnan(m_HomeDEC))
+            result=true;
+        else
+            result = (m_CurrentDEC==m_HomeDEC);
+    }
+    else {
+        result = true;
+    }
+    return result;
+}
+
 // Common Alpaca API methods
 void TelescopeBridge::handleConnected(const httplib::Request &req, httplib::Response &res)
 {
@@ -810,7 +832,7 @@ void TelescopeBridge::handleDeviceState(const httplib::Request &req, httplib::Re
     stateValArray.push_back(
     {
         {"Name", "AtHome"}, 
-        {"Value", m_IsAtHome}
+        {"Value", isAtHome()}
     });
     stateValArray.push_back(
     {
@@ -1138,7 +1160,7 @@ void TelescopeBridge::handleAtPark(const httplib::Request &req, httplib::Respons
 void TelescopeBridge::handleAtHome(const httplib::Request &req, httplib::Response &res) {
     INDI_UNUSED(req);
     std::lock_guard<std::mutex> lock(m_Mutex);
-    sendResponseValue(res, m_IsAtHome);    
+    sendResponseValue(res, isAtHome());    
 }
 
 void TelescopeBridge::handleIsPulseGuiding(const httplib::Request &req, httplib::Response &res) {
