@@ -92,9 +92,11 @@ double TelescopeBridge::computeLST(double longitude_deg,
 }
 
 double TelescopeBridge::getLST()  {
-    // Sidereal time is taken from Number if available, otherwise it is computed
+    
     bool computeFlag = true;
     double lst_alpaca;
+
+    // Sidereal time is taken from Number if available  (Eqmod for example), otherwise it is computed
     auto lstNumber = m_Device.getNumber("TIME_LST");
     if (lstNumber.isValid()) {
         for(auto &wvn: lstNumber) {
@@ -105,6 +107,7 @@ double TelescopeBridge::getLST()  {
             }
         }                
     } 
+
     if (computeFlag) {
         auto geoCoord = m_Device.getNumber("GEOGRAPHIC_COORD");
         if (!geoCoord.isValid())
@@ -1298,7 +1301,25 @@ void TelescopeBridge::handleSetPark(const httplib::Request &req, httplib::Respon
 }
 
 std::string TelescopeBridge::getUTCDate() {
-    std::string utc_alpaca="1970-01-01T00:00:00Z"; //fallback
+
+    std::string utc_alpaca; 
+
+    // Fallback to now as security
+    // Get current system time
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    // Convert to UTC tm struct safely
+    std::tm utc_tm;
+    #if defined(_MSC_VER)
+        gmtime_s(&utc_tm, &now_c); // Windows safe version
+    #else
+        gmtime_r(&now_c, &utc_tm); // POSIX safe version
+    #endif
+    // Format into string stream
+    std::ostringstream oss;
+    oss << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%SZ");
+    utc_alpaca = oss.str();        
+
     auto utcTxt = m_Device.getText("TIME_UTC");
     if (utcTxt) {
         for(auto &wvt: utcTxt) {
@@ -1308,11 +1329,18 @@ std::string TelescopeBridge::getUTCDate() {
                 if (pos != std::string::npos) {
                     // Replace 6 characters starting at 'pos' with "Z"
                     utc_alpaca=utc_indi.replace(pos, 6, "Z");
-                }               
+                }           
+                else {
+                    utc_alpaca = utc_indi;
+                    if (utc_alpaca.back() != 'Z') {
+                        utc_alpaca.push_back('Z');
+                    }
+                }    
                 break;
             }
         }
     }
+
     return utc_alpaca;
 }
 
@@ -1344,7 +1372,13 @@ std::string TelescopeBridge::getTimeStamp() {
 
 void TelescopeBridge::handleUTCDate(const httplib::Request &req, httplib::Response &res) {
     INDI_UNUSED(req);
-    std::string utc_alpaca = getUTCDate();
+    std::string utc_alpaca;
+    if ( m_Device.getNumber("TIME_LST").isValid() && m_AlpacaUTC!="" ) {
+        utc_alpaca = m_AlpacaUTC;
+    }
+    else {
+        utc_alpaca=getUTCDate();
+    }
     sendResponseValue(res,utc_alpaca);
 }
 
@@ -2230,22 +2264,39 @@ void TelescopeBridge::handleSetUTCDate(const httplib::Request &req, httplib::Res
         }
 
         std::string utc_alpaca = formData["UTCDate"];
+        m_AlpacaUTC = utc_alpaca;
 
-        auto utcTxt = m_Device.getText("TIME_UTC");
-        if (utcTxt)
-        {
-            std::string utc_indi="";
-            if (!utc_alpaca.empty() && utc_alpaca.back() == 'Z') {
-                // Replace the last 1 character with "+00:00"
-                utc_indi = utc_alpaca.replace(utc_alpaca.length() - 1, 1, "+00:00");
-            }            
-            if (!utc_indi.empty()) {
+        if (m_Device.getNumber("TIME_LST").isValid()) {
 
-                INDI::PropertyText textProperty(utcTxt);
-                textProperty[0].setText(utc_indi);
-                // Request to send the text to the device
-                requestNewText(textProperty);                  
-                success = true;
+            // We don't set UTC to INDI
+            // because it can change LST computation!
+            // (Indi EqMod driver does this!)
+            success=true;
+        }
+        else {
+            auto utcTxt = m_Device.getText("TIME_UTC");
+            if (utcTxt)
+            {
+                std::string utc_indi="";
+                if (!utc_alpaca.empty()) {
+                    std::tm tm = {};
+                    std::istringstream iss(utc_alpaca);
+                    
+                    // std::get_time automatically parses the date/time and stops at the '.' (or 'Z')
+                    iss >> std::get_time(&tm, "%Y-%m-%dT%H:%M:%S");
+
+                    // Convert the datetime structure back into a clean second-precision string
+                    std::ostringstream oss;
+                    oss << std::put_time(&tm, "%Y-%m-%dT%H:%M:%SZ");
+                    utc_indi = oss.str();
+                }          
+                if (!utc_indi.empty()) {
+                    INDI::PropertyText textProperty(utcTxt);
+                    textProperty[0].setText(utc_indi);
+                    // Request to send the text to the device
+                    requestNewText(textProperty);                  
+                    success = true;
+                }
             }
         }
     }
