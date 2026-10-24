@@ -200,7 +200,8 @@ class TelescopeBridge : public IDeviceBridge
         int m_PierSide {0};
         double m_HomeDEC; // see constructor
         bool isConnectedAlpaca {false};
-        bool isConnectingAlpaca {false}; // ITelescope V4 connect and disconnect async 
+        bool isConnectingAlpaca {false}; // ITelescope V4 connect and disconnect async
+        std::string m_AlpacaUTC="";  // cached UTC value instead of using direct INDI one
 
         // Thread safety
         std::mutex m_Mutex;
