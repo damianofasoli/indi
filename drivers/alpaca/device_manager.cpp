@@ -404,7 +404,7 @@ void DeviceManager::routeRequest(int deviceNumber, const std::string &deviceType
                                  const httplib::Request &req, httplib::Response &res,
                                  int clientTransactionID, int serverTransactionID)
 {
-    std::lock_guard<std::mutex> lock(m_Mutex);
+    //std::lock_guard<std::mutex> lock(m_Mutex); VERY IMPORTANT, with this lock active, every alpaca call blocks update thread, but we need it for sync operations to check for results
 
     // Find bridge for device number
     auto it = m_Bridges.find(deviceNumber);

@@ -436,7 +436,7 @@ void TelescopeBridge::handleCanSetPierSide(const httplib::Request &req, httplib:
 void TelescopeBridge::handleCanSlew(const httplib::Request &req, httplib::Response &res)
 {
     INDI_UNUSED(req);
-    sendResponseValue(res, false); // Only Async, see Telescope V4 Alpaca specifications
+    sendResponseValue(res, true); // Only Async, see Telescope V4 Alpaca specifications.  But Nina requires canslew to true also (not only canslewasync to true)
 }
 
 void TelescopeBridge::handleCanSlewAltAz(const httplib::Request &req, httplib::Response &res) 
@@ -1394,124 +1394,180 @@ void TelescopeBridge::handleSiderealTime(const httplib::Request &req, httplib::R
 }
 
 void TelescopeBridge::handleSlewToCoordinates(const httplib::Request &req, httplib::Response &res) {
-    INDI_UNUSED(req);
-    sendResponseStatus(res,false,"Can only slew to coordinates async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
+    handleSlewToCoordinatesRequest(res, req, false);
 }
 
 void TelescopeBridge::handleSlewToCoordinatesAsync(const httplib::Request &req, httplib::Response &res)
 {
-    std::lock_guard<std::mutex> lock(m_Mutex);    
-    if (m_IsParked) {
-        sendResponseStatus(res,false,"Cannot slew to coordinates when telescope is parked",1032); // ParkException
-    }   
-    else {
-            bool success = false;
-            try
-            {
-                // Parse form-urlencoded data from request body
-                std::map<std::string, std::string> formData;
-                DeviceManager::parseFormUrlEncodedBody(req.body, formData);
-
-                // Check if required parameters exist
-                if (formData.find("RightAscension") == formData.end() || formData.find("Declination") == formData.end())
-                {
-                    sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
-                    return;
-                }
-
-                // Convert values to double
-                double ra = std::stod(formData["RightAscension"]);
-                double dec = std::stod(formData["Declination"]);
-
-                if (ra<0.0 || ra>24.0) {
-                    sendResponseStatus(res, false, "Bad rigth ascension value: "+std::to_string(ra),1025); // InvalidValue exception
-                    return;
-                }
-
-                if (dec<-90.0 || dec>90.0) {
-                    sendResponseStatus(res, false, "Bad declination value: "+std::to_string(dec),1025); // InvalidValue exception
-                    return;
-                }
-
-                auto coordSet = m_Device.getSwitch("ON_COORD_SET");
-                auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
-                if (coordSet && eqCoord)
-                {
-
-                    // Update target coordinates
-                    auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
-                    if (eqTargetCoord)
-                    {
-                        INDI::PropertyNumber numberProperty(eqTargetCoord);
-                        for (auto &num : numberProperty)
-                        {
-                            if (num.isNameMatch("RA")) {
-                                num.setValue(ra);       
-                                m_IsTargetRASet=true;                     
-                            }                                                         
-                            else if (num.isNameMatch("DEC")) {
-                                num.setValue(dec);
-                                m_IsTargetDecSet = true;
-                            }
-                                
-                        }
-                        // Request to send the coordinates to the device
-                        requestNewNumber(numberProperty);
-                    }                    
-                    
-
-                    // Set to TRACK mode
-                    INDI::PropertySwitch switchProperty(coordSet);
-                    switchProperty.reset();
-                    switchProperty[0].setState(ISS_ON);
-                    // Request to send the switch to the device
-                    requestNewSwitch(switchProperty);
-
-                    // Set coordinates                
-                    INDI::PropertyNumber numberProperty(eqCoord);
-                    for (auto &num : numberProperty)
-                    {
-                        if (num.isNameMatch("RA"))
-                            num.setValue(ra);
-                        else if (num.isNameMatch("DEC"))
-                            num.setValue(dec);
-                    }
-                    // Request to send the coordinates to the device
-                    requestNewNumber(numberProperty);
-                    m_IsEqCoordsSlewing=true;
-
-                    success = true;
-
-
-                }
-            }
-            catch (const std::exception &e)
-            {
-                DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToCoordinatesAsync request: %s", e.what());
-            }
-            sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
-    } 
+    handleSlewToCoordinatesRequest(res, req, true);
 }
 
+void TelescopeBridge::handleSlewToCoordinatesRequest(httplib::Response &res, const httplib::Request &req, bool asyncMode)
+{
+    if (m_IsParked)
+    {
+        sendResponseStatus(res, false, "Cannot slew to coordinates when telescope is parked", 1032); // ParkException
+    }
+    else
+    {
+        bool success = false;
+        try
+        {
+            // Parse form-urlencoded data from request body
+            std::map<std::string, std::string> formData;
+            DeviceManager::parseFormUrlEncodedBody(req.body, formData);
+
+            // Check if required parameters exist
+            if (formData.find("RightAscension") == formData.end() || formData.find("Declination") == formData.end())
+            {
+                sendResponseStatus(res, false, "Missing RightAscension or Declination parameter");
+                return;
+            }
+
+            // Convert values to double
+            double ra = std::stod(formData["RightAscension"]);
+            double dec = std::stod(formData["Declination"]);
+
+            if (ra < 0.0 || ra > 24.0)
+            {
+                sendResponseStatus(res, false, "Bad rigth ascension value: " + std::to_string(ra), 1025); // InvalidValue exception
+                return;
+            }
+
+            if (dec < -90.0 || dec > 90.0)
+            {
+                sendResponseStatus(res, false, "Bad declination value: " + std::to_string(dec), 1025); // InvalidValue exception
+                return;
+            }
+
+            success = SlewToCoordinatesAsync(ra, dec);
+
+            if (success && !asyncMode) {  
+                auto startTime = std::chrono::steady_clock::now();
+                const auto timeout = std::chrono::seconds(90);              
+                while (true) {
+                    // Wait
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    if (std::chrono::steady_clock::now() - startTime > timeout) {
+                        sendResponseStatus(res, false, "Timeout to slew to coordinates");
+                        return;
+                    }
+                    {
+                        std::lock_guard<std::mutex> lock(m_Mutex);
+                        if (!m_IsEqCoordsSlewing) {
+                            break; // Slew completed successfully
+                        }                        
+                    }
+                } 
+            }
+
+        }
+        catch (const std::exception &e)
+        {
+            DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_ERROR, "Failed to parse SlewToCoordinatesAsync request: %s", e.what());
+        }
+        sendResponseStatus(res, success, success ? "" : "Failed to slew to coordinates");
+    }
+}
+
+bool TelescopeBridge::SlewToCoordinatesAsync(double ra, double dec)
+{
+    std::lock_guard<std::mutex> lock(m_Mutex);
+
+    bool success = false; 
+
+    auto coordSet = m_Device.getSwitch("ON_COORD_SET");
+    auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+    if (coordSet && eqCoord)
+    {
+
+        // Update target coordinates
+        auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
+        if (eqTargetCoord)
+        {
+            INDI::PropertyNumber numberProperty(eqTargetCoord);
+            for (auto &num : numberProperty)
+            {
+                if (num.isNameMatch("RA"))
+                {
+                    num.setValue(ra);
+                    m_IsTargetRASet = true;
+                }
+                else if (num.isNameMatch("DEC"))
+                {
+                    num.setValue(dec);
+                    m_IsTargetDecSet = true;
+                }
+            }
+            // Request to send the coordinates to the device
+            requestNewNumber(numberProperty);
+        }
+
+        // Set to TRACK mode
+        INDI::PropertySwitch switchProperty(coordSet);
+        switchProperty.reset();
+        switchProperty[0].setState(ISS_ON);
+        // Request to send the switch to the device
+        requestNewSwitch(switchProperty);
+
+        // Set coordinates
+        INDI::PropertyNumber numberProperty(eqCoord);
+        for (auto &num : numberProperty)
+        {
+            if (num.isNameMatch("RA"))
+                num.setValue(ra);
+            else if (num.isNameMatch("DEC"))
+                num.setValue(dec);
+        }
+        // Request to send the coordinates to the device
+        requestNewNumber(numberProperty);
+        m_IsEqCoordsSlewing = true;
+
+        success = true;
+    }
+    
+    return success;
+}
 
 void TelescopeBridge::handleSlewToTarget(const httplib::Request &req, httplib::Response &res) {
-    INDI_UNUSED(req);
-    sendResponseStatus(res,false,"Can only slew to target async",1024); // NotImplementedException, see Telescope V4 Alpaca specifications
+    handleSlewToTargetRequest(req,res,false);
 }
 
 void TelescopeBridge::handleSlewToTargetAsync(const httplib::Request &req, httplib::Response &res) {
+    handleSlewToTargetRequest(req,res,true);
+}
 
+void TelescopeBridge::handleSlewToTargetRequest(const httplib::Request &req, httplib::Response &res, bool asyncMode) {
     if (m_IsParked) {
         sendResponseStatus(res,false,"Cannot slew to target when telescope is parked",1032); // ParkException
     }   
     else {
-
         INDI_UNUSED(req);
-
         std::string msg="";
+
         bool success = SlewToTargetAsync(msg);
+
+        if (success && !asyncMode) {  
+            auto startTime = std::chrono::steady_clock::now();
+            const auto timeout = std::chrono::seconds(90);              
+            while (true) {
+                // Wait
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                if (std::chrono::steady_clock::now() - startTime > timeout) {
+                    sendResponseStatus(res, false, "Timeout to slew to target");
+                    return;
+                }
+                {
+                    std::lock_guard<std::mutex> lock(m_Mutex);
+                    if (!m_IsEqCoordsSlewing) {
+                        break; // Slew completed successfully
+                    }                        
+                }
+            } 
+        }        
+
         sendResponseStatus(res, success, msg);
-    }
+    }    
 }
 
 bool TelescopeBridge::SlewToTargetAsync(std::string &msg)
