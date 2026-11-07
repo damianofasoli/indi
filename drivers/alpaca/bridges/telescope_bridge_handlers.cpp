@@ -132,22 +132,22 @@ double TelescopeBridge::getLST()  {
 bool TelescopeBridge::isAtHome() {
     bool result;
     INDI::Property eqCoord = m_Device.getProperty("EQUATORIAL_EOD_COORD");
-    INDI::Property hoCoord = m_Device.getProperty("HORIZONTAL_COORD");
-    if (eqCoord && hoCoord) {
+    if (eqCoord) {
         double eps = 0.005;  // 18 arcseconds
-        bool checkAZ = std::abs(std::fmod(m_CurrentAZ, 360.0)) < eps;
-        bool checkDEC = std::abs(std::fmod(std::abs(m_CurrentDEC), 90.0)) - 90.0 < eps; 
-        result = checkAZ && checkDEC;
-    }
-    else if (eqCoord) {
-        if (std::isnan(m_HomeDEC))
-            result=true;
-        else
-            result = (m_CurrentDEC==m_HomeDEC);
+        bool checkDEC = std::abs(std::abs(std::fmod(m_CurrentDEC, 180.0)) - 90.0) < eps;
+        // North Pole m_CurrentDEC=90, South Pole m_CurrentDec=-90
+        INDI::Property hoCoord = m_Device.getProperty("HORIZONTAL_COORD");
+        if (hoCoord) {
+            bool checkAZ = std::abs(std::fmod(m_CurrentAZ, 360.0)) < eps; 
+            result = checkAZ && checkDEC; 
+        }
+        else {
+            result = checkDEC && !m_IsEqCoordsSlewing; // check also slewing (FindHome case) for stable (but not known) RA
+        }
     }
     else {
         result = true;
-    }
+    }    
     return result;
 }
 
@@ -1246,9 +1246,11 @@ void TelescopeBridge::handleFindHome(const httplib::Request &req, httplib::Respo
             }
             // Apply GO HOME action
             if (i>=0) {
+                std::lock_guard<std::mutex> lock(m_Mutex);
                 switchProperty.reset();
                 switchProperty[i].setState(ISS_ON);
                 requestNewSwitch(switchProperty);
+                m_IsEqCoordsSlewing=true;
                 success = true;
             }
             sendResponseStatus(res, success, success ? "" : "Failed to send to home telescope");  
