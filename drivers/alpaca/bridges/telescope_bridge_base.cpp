@@ -42,7 +42,6 @@ using json = nlohmann::json;
 TelescopeBridge::TelescopeBridge(INDI::BaseDevice device, int deviceNumber)
     : m_Device(device), m_DeviceNumber(deviceNumber)
 {
-    m_HomeDEC = std::nan("");
     DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_SESSION, "Created telescope bridge for device %s with number %d",
                  device.getDeviceName(), deviceNumber);
 }
@@ -293,8 +292,7 @@ void TelescopeBridge::updateProperty(INDI::Property property)
                     m_CurrentRA = num.getValue();
                 }
                 else if (num.isNameMatch("DEC")) {              
-                    m_CurrentDEC = num.getValue();
-                    if (std::isnan(m_HomeDEC)) m_HomeDEC=m_CurrentDEC;                
+                    m_CurrentDEC = num.getValue();            
                 }
             }
             DEBUGFDEVICE(m_Device.getDeviceName(), INDI::Logger::DBG_DEBUG, "Updated RA/DEC: %f, %f", m_CurrentRA, m_CurrentDEC);             
