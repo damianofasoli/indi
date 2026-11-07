@@ -1962,7 +1962,7 @@ void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Res
                 if (guideNS)
                 {
                     INDI::PropertyNumber numberProperty(guideNS);
-                    numberProperty[direction].setValue(duration);
+                    numberProperty[direction==0 ? 0 :1].setValue(duration);
                     // Request to send the guide command to the device
                     requestNewNumber(numberProperty);
                     m_IsPulseGuiding=true;
@@ -1975,7 +1975,7 @@ void TelescopeBridge::handlePulseGuide(const httplib::Request &req, httplib::Res
                 if (guideWE)
                 {
                     INDI::PropertyNumber numberProperty(guideWE);
-                    numberProperty[direction - 2].setValue(duration);
+                    numberProperty[direction==2 ? 1 :0].setValue(duration);
                     // Request to send the guide command to the device
                     requestNewNumber(numberProperty);
                     m_IsPulseGuiding=true;
