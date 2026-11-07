@@ -347,28 +347,26 @@ void TelescopeBridge::updateProperty(INDI::Property property)
         else
         {
             // Check if the other axis is still moving
+            bool isMovingOtherAxis = false;
             if (property.isNameMatch("TELESCOPE_MOTION_NS"))
             {
                 auto weSp = m_Device.getSwitch("TELESCOPE_MOTION_WE");
                 if (weSp)
                 {
                     INDI::PropertySwitch weSwitch(weSp);
-                    m_IsMotionSlewing = (weSwitch[0].getState() == ISS_ON || weSwitch[1].getState() == ISS_ON);
+                    isMovingOtherAxis = (weSwitch[0].getState() == ISS_ON || weSwitch[1].getState() == ISS_ON);
                 }
-                else
-                    m_IsMotionSlewing = false;
             }
-            else
+            else if (property.isNameMatch("TELESCOPE_MOTION_WE"))
             {
                 auto nsSp = m_Device.getSwitch("TELESCOPE_MOTION_NS");
                 if (nsSp)
                 {
                     INDI::PropertySwitch nsSwitch(nsSp);
-                    m_IsMotionSlewing = (nsSwitch[0].getState() == ISS_ON || nsSwitch[1].getState() == ISS_ON);
+                    isMovingOtherAxis = (nsSwitch[0].getState() == ISS_ON || nsSwitch[1].getState() == ISS_ON);
                 }
-                else
-                    m_IsMotionSlewing = false;
             }
+            if (isMovingOtherAxis) m_IsMotionSlewing=true;
         }
         if (!m_IsMotionSlewing) {
             m_IsMotionSlewing = (property.getState() == IPS_BUSY);
