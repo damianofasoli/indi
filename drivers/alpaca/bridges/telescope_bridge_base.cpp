@@ -390,7 +390,7 @@ void TelescopeBridge::updateProperty(INDI::Property property)
         }
         else
         {
-            auto nsTg = m_Device.getProperty("TELESCOPE_TIMED_GUIDE_WE");
+            auto nsTg = m_Device.getProperty("TELESCOPE_TIMED_GUIDE_NS");
             if (nsTg)
             {
                 pulsing = (nsTg.getState() == IPS_BUSY);
