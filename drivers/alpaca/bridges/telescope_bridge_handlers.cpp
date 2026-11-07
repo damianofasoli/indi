@@ -1074,8 +1074,10 @@ void TelescopeBridge::handleGuideRateDeclination(const httplib::Request &req, ht
                 INDI::PropertyNumber numberProperty(guideRateNmb);
                 for (auto &num : numberProperty)
                 {
-                    if (num.isNameMatch("GUIDE_RATE_NS"))
-                        num.setValue(rate);
+                    if (num.isNameMatch("GUIDE_RATE_NS")) {
+                        double factor = 15.041067 / 3600; // sidereal speed in degrees for second
+                        num.setValue(rate/factor);
+                    }
                 }
                 // Request to send rate to the device
                 requestNewNumber(numberProperty);
@@ -1094,7 +1096,8 @@ void TelescopeBridge::handleGuideRateDeclination(const httplib::Request &req, ht
             {
                 if (num.isNameMatch("GUIDE_RATE_NS")) {
                     guideRate = num.getValue();
-                    sendResponseValue(res, guideRate);
+                    double factor = 15.041067 / 3600; // sidereal speed in degrees for second
+                    sendResponseValue(res, guideRate*factor);
                     return;
                 }
             } 
@@ -1123,8 +1126,10 @@ void TelescopeBridge::handleGuideRateRightAscension(const httplib::Request &req,
                 INDI::PropertyNumber numberProperty(guideRateNmb);
                 for (auto &num : numberProperty)
                 {
-                    if (num.isNameMatch("GUIDE_RATE_WE"))
-                        num.setValue(rate);
+                    if (num.isNameMatch("GUIDE_RATE_WE")) {
+                        double factor = 15.041067 / 3600; // sidereal speed in degrees for second
+                        num.setValue(rate/factor);
+                    }
                 }
                 // Request to send rate to the device
                 requestNewNumber(numberProperty);
@@ -1143,7 +1148,8 @@ void TelescopeBridge::handleGuideRateRightAscension(const httplib::Request &req,
             {
                 if (num.isNameMatch("GUIDE_RATE_WE")) {
                     guideRate = num.getValue();
-                    sendResponseValue(res, guideRate);
+                    double factor = 15.041067 / 3600; // sidereal speed in degrees for second
+                    sendResponseValue(res, guideRate*factor);
                     return;
                 }
             } 
