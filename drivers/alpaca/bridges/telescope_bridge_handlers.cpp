@@ -1677,6 +1677,17 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
                 return;
             }
 
+            // Check for ALIGNSYNCMODE swith (EQMod uses it)
+            // and set ALIGNSTANDARDSYNC instead of APPENDSTANDARDSYNC
+            auto alignSyncModeSw = m_Device.getSwitch("ALIGNSYNCMODE");
+            if (alignSyncModeSw) {
+                INDI::PropertySwitch switchProperty(alignSyncModeSw);
+                switchProperty.reset();
+                switchProperty[0].setState(ISS_ON);
+                // Request to send the switch to the device
+                requestNewSwitch(switchProperty);
+            }
+
             // Update target coordinates
             auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
             if (eqTargetCoord)
