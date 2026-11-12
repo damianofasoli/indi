@@ -1775,43 +1775,6 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
     }
 }
 
-// void TelescopeBridge::SyncWait(bool &success, INDI::PropertyNumber &eqCoord, std::string &failMessage)
-// {
-//     // sync wait
-//     auto startTime = std::chrono::steady_clock::now();
-//     auto timeout = std::chrono::seconds(5);
-//     auto pollInterval = std::chrono::milliseconds(50);
-//     bool waitAgain = true;
-//     std::this_thread::sleep_for(pollInterval); // time to have state set to IPS_BUSY
-//     while (success && waitAgain)
-//     {
-//         IPState currentState = eqCoord.getState();
-//         if (currentState == IPS_OK)
-//         {
-//             waitAgain = false;
-//         }
-//         else if (currentState == IPS_ALERT)
-//         {
-//             failMessage = "Indi sync failed";
-//             success = false;
-//         }
-//         else
-//         {
-//             // Check Timeout
-//             auto elapsedTime = std::chrono::steady_clock::now() - startTime;
-//             if (elapsedTime > timeout)
-//             {
-//                 success = false;
-//                 failMessage = "Indi sync not completed, timeout";
-//             }
-//             else
-//             {
-//                 std::this_thread::sleep_for(pollInterval);
-//             }
-//         }
-//     }
-// }
-
 void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::Response &res) 
 {
     if (m_IsParked) {
@@ -1910,7 +1873,7 @@ void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::R
                         }
                     }
                 }         
-                       
+
             }
 
             sendResponseStatus(res, success, success ? "" : "Failed to sync to target" + (failMessage=="" ? "" : ", " + failMessage));
