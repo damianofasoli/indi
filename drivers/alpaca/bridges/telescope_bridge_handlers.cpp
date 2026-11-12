@@ -1478,17 +1478,15 @@ void TelescopeBridge::handleSlewToCoordinatesRequest(httplib::Response &res, con
     }
 }
 
-bool TelescopeBridge::SlewToCoordinatesAsync(double ra, double dec)
+bool TelescopeBridge::SlewToCoordinatesAsync(double ra, double dec) 
 {
     std::lock_guard<std::mutex> lock(m_Mutex);
-
     bool success = false; 
 
     auto coordSet = m_Device.getSwitch("ON_COORD_SET");
     auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
     if (coordSet && eqCoord)
     {
-
         // Update target coordinates
         auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
         if (eqTargetCoord)
@@ -1683,6 +1681,7 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
             auto eqTargetCoord = m_Device.getNumber("TARGET_EOD_COORD");
             if (eqTargetCoord)
             {
+                std::lock_guard<std::mutex> lock(m_Mutex);
                 INDI::PropertyNumber numberProperty(eqTargetCoord);
                 for (auto &num : numberProperty)
                 {
@@ -1704,6 +1703,8 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
             auto eqCoord = m_Device.getNumber("EQUATORIAL_EOD_COORD");
             if (coordSet && eqCoord)
             {
+                std::lock_guard<std::mutex> lock(m_Mutex);
+                
                 // Set to SYNC mode
                 INDI::PropertySwitch switchProperty(coordSet);
                 switchProperty.reset();
@@ -1721,17 +1722,38 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
                     else if (num.isNameMatch("DEC")) {
                         num.setValue(dec);
                     }
-                        
                 }
+
                 // Request to send the coordinates to the device
-                requestNewNumber(numberProperty);
-
+                requestNewNumber(numberProperty);          
                 success = true;
-
-                auto waitInterval = std::chrono::milliseconds(200);
-                std::this_thread::sleep_for(waitInterval);
-                //SyncWait(success, numberProperty, failMessage);
             }
+
+            if (success) {
+                // wait for sync end
+                auto startTime = std::chrono::steady_clock::now();
+                const auto timeout = std::chrono::seconds(20);              
+                while (success) {
+                    // Wait
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    if (std::chrono::steady_clock::now() - startTime > timeout) {
+                        //break; // temp
+                        success=false;
+                        failMessage="Timeout to sync to coordinates";
+                    }
+                    else {
+                        std::lock_guard<std::mutex> lock(m_Mutex);
+                        auto eqCoordProp = m_Device.getProperty("EQUATORIAL_EOD_COORD");
+                        if (eqCoordProp) {
+                            if (eqCoordProp.getState()==IPS_OK) {                          
+                                std::this_thread::sleep_for(std::chrono::seconds(1)); // wait again, needed with some mounts to read synced coordinates
+                                break; // Sync completed
+                            } 
+                        }
+                    }
+                } 
+            }
+
         }
         catch (const std::exception &e)
         {
