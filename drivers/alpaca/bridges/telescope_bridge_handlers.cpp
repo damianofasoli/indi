@@ -1743,10 +1743,11 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
             if (success) {
                 // wait for sync end
                 auto startTime = std::chrono::steady_clock::now();
-                const auto timeout = std::chrono::seconds(20);              
+                const auto timeout = std::chrono::seconds(5); 
+                double check_CurrentRA=-ra, check_CurrentDEC=-dec; // init with fake val             
                 while (success) {
                     // Wait
-                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
                     if (std::chrono::steady_clock::now() - startTime > timeout) {
                         //break; // temp
                         success=false;
@@ -1754,12 +1755,21 @@ void TelescopeBridge::handleSyncToCoordinates(const httplib::Request &req, httpl
                     }
                     else {
                         std::lock_guard<std::mutex> lock(m_Mutex);
-                        auto eqCoordProp = m_Device.getProperty("EQUATORIAL_EOD_COORD");
-                        if (eqCoordProp) {
-                            if (eqCoordProp.getState()==IPS_OK) {                          
-                                std::this_thread::sleep_for(std::chrono::milliseconds(750)); // wait again, needed with some mounts to read synced coordinates
+                        auto eqCoordFast = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+                        if (eqCoordFast) {
+                            double eps = 0.002; // 7.5 arcseconds
+                            for (auto &num : eqCoordFast)
+                            {
+                                if (num.isNameMatch("RA")) {                
+                                    check_CurrentRA = num.getValue();
+                                }
+                                else if (num.isNameMatch("DEC")) {              
+                                    check_CurrentDEC = num.getValue();            
+                                }
+                            }
+                            if (std::abs(ra-check_CurrentRA)<eps && std::abs(dec-check_CurrentDEC)<eps) {
                                 break; // Sync completed
-                            } 
+                            }
                         }
                     }
                 } 
@@ -1853,10 +1863,11 @@ void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::R
             if (success) {
                 // wait for sync end
                 auto startTime = std::chrono::steady_clock::now();
-                const auto timeout = std::chrono::seconds(20);              
+                const auto timeout = std::chrono::seconds(5);     
+                double check_CurrentRA=-ra, check_CurrentDEC=-dec; // init with fake val         
                 while (success) {
                     // Wait
-                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
                     if (std::chrono::steady_clock::now() - startTime > timeout) {
                         //break; // temp
                         success=false;
@@ -1864,12 +1875,21 @@ void TelescopeBridge::handleSyncToTarget(const httplib::Request &req, httplib::R
                     }
                     else {
                         std::lock_guard<std::mutex> lock(m_Mutex);
-                        auto eqCoordProp = m_Device.getProperty("EQUATORIAL_EOD_COORD");
-                        if (eqCoordProp) {
-                            if (eqCoordProp.getState()==IPS_OK) {                          
-                                std::this_thread::sleep_for(std::chrono::milliseconds(750)); // wait again, needed with some mounts to read synced coordinates
+                        auto eqCoordFast = m_Device.getNumber("EQUATORIAL_EOD_COORD");
+                        if (eqCoordFast) {
+                            double eps = 0.002; // 7.5 arcseconds
+                            for (auto &num : eqCoordFast)
+                            {
+                                if (num.isNameMatch("RA")) {                
+                                    check_CurrentRA = num.getValue();
+                                }
+                                else if (num.isNameMatch("DEC")) {              
+                                    check_CurrentDEC = num.getValue();            
+                                }
+                            }
+                            if (std::abs(ra-check_CurrentRA)<eps && std::abs(dec-check_CurrentDEC)<eps) {
                                 break; // Sync completed
-                            } 
+                            }
                         }
                     }
                 }         
